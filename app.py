@@ -64,7 +64,7 @@ def initialize_inventory_database() -> None:
             );
         """)
         columns = {
-            row["name"] for row in connection.execute("PRAGMA table_info(inventory_devices)")
+            row[1] for row in connection.execute("PRAGMA table_info(inventory_devices)")
         }
         if "current_version" not in columns:
             connection.execute("ALTER TABLE inventory_devices ADD COLUMN current_version TEXT")
