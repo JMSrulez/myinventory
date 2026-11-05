@@ -96,6 +96,33 @@ def read_inventory() -> list[dict[str, Any]]:
     return result
 
 
+def read_inventory_network(network_id: str) -> dict[str, str] | None:
+    with sqlite3.connect(INVENTORY_DB_PATH) as connection:
+        connection.row_factory = sqlite3.Row
+        network = connection.execute(
+            "SELECT network_id, network_name, organization_id, organization_name "
+            "FROM inventory_networks WHERE network_id = ?",
+            (network_id,),
+        ).fetchone()
+    if network is None:
+        return None
+    return {
+        "id": network["network_id"],
+        "name": network["network_name"],
+        "organizationId": network["organization_id"],
+        "organizationName": network["organization_name"],
+    }
+
+
+def delete_inventory_network(network_id: str) -> bool:
+    with sqlite3.connect(INVENTORY_DB_PATH) as connection:
+        connection.execute("DELETE FROM inventory_devices WHERE network_id = ?", (network_id,))
+        result = connection.execute(
+            "DELETE FROM inventory_networks WHERE network_id = ?", (network_id,)
+        )
+        return result.rowcount > 0
+
+
 def store_inventory(networks: list[dict[str, Any]]) -> int:
     captured_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     device_count = 0
@@ -204,6 +231,24 @@ def meraki_get(path: str) -> list[dict[str, Any]]:
                 next_url = urljoin(urljoin(API_ROOT, path.lstrip("/")), match.group(1))
                 break
     return results
+
+
+def capture_one_network(network: dict[str, str]) -> dict[str, Any]:
+    network_id = network["id"]
+    organization_id = network["organizationId"]
+    query = urlencode([("perPage", "1000"), ("networkIds[]", network_id)])
+    availability = meraki_get(
+        "organizations/" + quote(organization_id, safe="")
+        + "/devices/availabilities?" + query
+    )
+    device_statuses = {
+        str(item.get("serial")): str(item.get("status") or "")
+        for item in availability if item.get("serial")
+    }
+    devices = meraki_get("networks/" + quote(network_id, safe="") + "/devices")
+    for device in devices:
+        device["status"] = device_statuses.get(str(device.get("serial") or ""), "")
+    return {**network, "devices": devices}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -418,6 +463,48 @@ class Handler(BaseHTTPRequestHandler):
                 "networkCount": len(captured_networks),
                 "deviceCount": device_count,
             })
+            return
+        if self.path == "/api/inventory/refresh":
+            if API_KEY is None:
+                self.send_json(401, {"error": "Connectez-vous d’abord à Meraki."})
+                return
+            network_id = data.get("networkId")
+            if not isinstance(network_id, str) or not network_id:
+                self.send_json(400, {"error": "Sélection de réseau invalide."})
+                return
+            try:
+                network = read_inventory_network(network_id)
+            except sqlite3.Error:
+                self.send_json(500, {"error": "Impossible de lire l’inventaire enregistré."})
+                return
+            if network is None:
+                self.send_json(404, {"error": "Réseau introuvable dans l’inventaire."})
+                return
+            try:
+                captured_network = capture_one_network(network)
+                device_count = store_inventory([captured_network])
+            except MerakiError as exc:
+                self.send_json(502, {"error": str(exc)})
+                return
+            except sqlite3.Error:
+                self.send_json(500, {"error": "Impossible d’enregistrer l’inventaire."})
+                return
+            self.send_json(200, {"networkId": network_id, "deviceCount": device_count})
+            return
+        if self.path == "/api/inventory/delete":
+            network_id = data.get("networkId")
+            if not isinstance(network_id, str) or not network_id:
+                self.send_json(400, {"error": "Sélection de réseau invalide."})
+                return
+            try:
+                deleted = delete_inventory_network(network_id)
+            except sqlite3.Error:
+                self.send_json(500, {"error": "Impossible de supprimer l’inventaire."})
+                return
+            if not deleted:
+                self.send_json(404, {"error": "Réseau introuvable dans l’inventaire."})
+                return
+            self.send_json(200, {"networkId": network_id, "deleted": True})
             return
         if self.path == "/api/disconnect":
             API_KEY = None

@@ -42,6 +42,12 @@
     h2 { margin: 0; font-size: 18px; font-weight: 680; letter-spacing: -.015em; }
     .hint { margin: 6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
     .count { flex: 0 0 auto; padding: 6px 9px; border-radius: 7px; background: #f0f3f1; color: #46564f; font-size: 12px; font-weight: 650; }
+    .panel-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+    .action-button { min-height: 34px; padding: 0 11px; border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--ink); font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+    .action-button:hover:not(:disabled) { background: #f6f8f6; }
+    .action-button:disabled { opacity: .6; cursor: wait; }
+    .action-button-danger { border-color: #efcfcb; color: #a63e39; }
+    .action-button-danger:hover:not(:disabled) { background: #fff7f6; }
     .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 9px; }
     table { width: 100%; border-collapse: collapse; text-align: left; }
     th, td { padding: 12px 14px; border-bottom: 1px solid #edf0ee; font-size: 13px; }
@@ -57,6 +63,7 @@
     .empty strong { display: block; margin-bottom: 7px; color: #46564f; font-size: 14px; font-weight: 650; }
     .empty span { font-size: 13px; line-height: 1.6; }
     .message { margin: 0 0 18px; padding: 12px 15px; border: 1px solid #f0cfcb; border-radius: 9px; background: #fff7f6; color: #a63e39; font-size: 13px; line-height: 1.5; }
+    .message.success { border-color: #cce5d3; background: #f0f8f2; color: #17613d; }
     @media (max-width: 650px) {
       .shell { padding: 25px 16px 45px; }
       header { align-items: flex-start; flex-direction: column; margin-bottom: 20px; }
@@ -110,10 +117,16 @@
         noInventory: "No inventory saved", goToSetup: "Go to Setup, select networks and capture them to display the devices here.",
         noNetworkName: "Unnamed network", organization: "Organization", capturedOn: "Captured on",
         device: "device", devices: "devices", noDevices: "No devices were returned for this network.",
+        refresh: "Refresh", deleteInventory: "Delete inventory", refreshing: "Refreshing…", deleting: "Deleting…",
+        confirmDelete: "Delete the saved inventory for this network? This cannot be undone.",
+        refreshSuccess: "This network inventory was refreshed.", deleteSuccess: "This network inventory was deleted.",
         name: "Name", model: "Model", serialNumber: "Serial number", managementIp: "Management IP",
         currentVersion: "Current version", status: "Status", statusOnline: "Online", statusOffline: "Offline",
         statusAlerting: "Alerting", statusDormant: "Dormant",
         httpError: "HTTP error {status}", errReadInventory: "Could not read the saved inventory.", errLocalOnly: "Local access only.",
+        errConnectMeraki: "Connect to Meraki from Setup before refreshing an inventory.",
+        errNetworkNotFound: "This network inventory could not be found.", errSaveInventory: "Could not save the refreshed inventory.",
+        errDeleteInventory: "Could not delete the inventory.",
         errPageNotFound: "Page not found."
       },
       fr: {
@@ -124,10 +137,16 @@
         noInventory: "Aucun inventaire enregistré", goToSetup: "Retournez dans Setup, sélectionnez des réseaux et lancez une capture pour afficher les équipements ici.",
         noNetworkName: "Réseau sans nom", organization: "Organisation", capturedOn: "Capturé le",
         device: "équipement", devices: "équipements", noDevices: "Aucun équipement n’a été renvoyé pour ce réseau.",
+        refresh: "Actualiser", deleteInventory: "Supprimer l’inventaire", refreshing: "Actualisation…", deleting: "Suppression…",
+        confirmDelete: "Supprimer l’inventaire enregistré pour ce réseau ? Cette action est irréversible.",
+        refreshSuccess: "L’inventaire de ce réseau a été actualisé.", deleteSuccess: "L’inventaire de ce réseau a été supprimé.",
         name: "Nom", model: "Modèle", serialNumber: "Numéro de série", managementIp: "IP de gestion",
         currentVersion: "Version actuelle", status: "Statut", statusOnline: "En ligne", statusOffline: "Hors ligne",
         statusAlerting: "En alerte", statusDormant: "Inactif",
         httpError: "Erreur HTTP {status}", errReadInventory: "Impossible de lire l’inventaire enregistré.", errLocalOnly: "Accès local uniquement.",
+        errConnectMeraki: "Connectez-vous à Meraki depuis Setup avant d’actualiser un inventaire.",
+        errNetworkNotFound: "Cet inventaire réseau est introuvable.", errSaveInventory: "Impossible d’enregistrer l’inventaire actualisé.",
+        errDeleteInventory: "Impossible de supprimer l’inventaire.",
         errPageNotFound: "Page introuvable."
       }
     };
@@ -146,7 +165,11 @@
     );
     const errorKeys = {
       "Impossible de lire l’inventaire enregistré.": "errReadInventory",
-      "Accès local uniquement.": "errLocalOnly", "Page introuvable.": "errPageNotFound"
+      "Accès local uniquement.": "errLocalOnly", "Page introuvable.": "errPageNotFound",
+      "Connectez-vous d’abord à Meraki.": "errConnectMeraki",
+      "Réseau introuvable dans l’inventaire.": "errNetworkNotFound",
+      "Impossible d’enregistrer l’inventaire.": "errSaveInventory",
+      "Impossible de supprimer l’inventaire.": "errDeleteInventory"
     };
     function localizeError(message) {
       if (errorKeys[message]) return t(errorKeys[message]);
@@ -161,11 +184,15 @@
       const toggle = document.getElementById("language-toggle");
       toggle.textContent = language === "fr" ? "English" : "Français";
       toggle.setAttribute("aria-label", language === "fr" ? "Passer la langue en anglais" : "Switch language to French");
-      if (errorMessage.dataset.rawMessage) errorMessage.textContent = localizeError(errorMessage.dataset.rawMessage);
+      if (errorMessage.dataset.messageKey) errorMessage.textContent = t(errorMessage.dataset.messageKey);
+      else if (errorMessage.dataset.rawMessage) errorMessage.textContent = localizeError(errorMessage.dataset.rawMessage);
     }
 
-    async function api(path) {
-      const response = await fetch(path, { headers: { "Accept": "application/json" } });
+    async function api(path, options = {}) {
+      const response = await fetch(path, {
+        ...options,
+        headers: { "Accept": "application/json", ...(options.headers || {}) }
+      });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || t("httpError", { status: response.status }));
       return data;
@@ -199,7 +226,22 @@
       const count = document.createElement("span");
       count.className = "count";
       count.textContent = network.devices.length + " " + t(network.devices.length === 1 ? "device" : "devices");
-      heading.append(details, count);
+      const actions = document.createElement("div");
+      actions.className = "panel-actions";
+      const refreshButton = document.createElement("button");
+      refreshButton.type = "button";
+      refreshButton.className = "action-button";
+      refreshButton.textContent = t("refresh");
+      refreshButton.setAttribute("aria-label", t("refresh") + " · " + (network.name || t("noNetworkName")));
+      refreshButton.addEventListener("click", () => refreshNetwork(network.id, refreshButton));
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "action-button action-button-danger";
+      deleteButton.textContent = t("deleteInventory");
+      deleteButton.setAttribute("aria-label", t("deleteInventory") + " · " + (network.name || t("noNetworkName")));
+      deleteButton.addEventListener("click", () => deleteNetwork(network.id, deleteButton));
+      actions.append(count, refreshButton, deleteButton);
+      heading.append(details, actions);
       panel.append(heading);
 
       if (!network.devices.length) {
@@ -253,12 +295,32 @@
 
     function applyLanguage() {
       applyStaticTranslations();
-      if (networks.length) renderInventory(activeNetworkIndex);
+      renderInventory(activeNetworkIndex);
+    }
+
+    function renderEmptyInventory() {
+      document.getElementById("tabs-wrap").hidden = true;
+      panel.removeAttribute("aria-labelledby");
+      panel.replaceChildren();
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      const inner = document.createElement("div");
+      inner.className = "empty-inner";
+      const title = document.createElement("strong");
+      title.textContent = t("noInventory");
+      const hint = document.createElement("span");
+      hint.textContent = t("goToSetup");
+      inner.append(title, hint);
+      empty.append(inner);
+      panel.append(empty);
     }
 
     function renderInventory(selectedIndex = activeNetworkIndex) {
       tabs.replaceChildren();
-      if (!networks.length) return;
+      if (!networks.length) {
+        renderEmptyInventory();
+        return;
+      }
       activeNetworkIndex = Math.min(selectedIndex, networks.length - 1);
       document.getElementById("tabs-wrap").hidden = false;
       networks.forEach((network, index) => {
@@ -286,17 +348,72 @@
       renderPanel(activeNetworkIndex);
     }
 
-    (async function loadInventory() {
+    function showMessage(message, kind = "error") {
+      errorMessage.hidden = false;
+      errorMessage.classList.toggle("success", kind === "success");
+      errorMessage.setAttribute("role", kind === "error" ? "alert" : "status");
+      errorMessage.dataset.rawMessage = kind === "error" ? message : "";
+      errorMessage.dataset.messageKey = kind === "success" ? message : "";
+      errorMessage.textContent = kind === "error" ? localizeError(message) : t(message);
+    }
+
+    async function loadInventory(preferredNetworkId) {
       try {
         const result = await api("/api/inventory");
         networks = result.networks || [];
-        renderInventory();
+        const preferredIndex = networks.findIndex((network) => network.id === preferredNetworkId);
+        renderInventory(preferredIndex >= 0 ? preferredIndex : activeNetworkIndex);
+        return true;
       } catch (error) {
-        errorMessage.dataset.rawMessage = error.message;
-        errorMessage.textContent = localizeError(error.message);
-        errorMessage.hidden = false;
+        showMessage(error.message);
+        return false;
       }
-    })();
+    }
+
+    async function refreshNetwork(networkId, button) {
+      errorMessage.hidden = true;
+      button.disabled = true;
+      button.textContent = t("refreshing");
+      try {
+        await api("/api/inventory/refresh", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ networkId })
+        });
+        if (await loadInventory(networkId)) showMessage("refreshSuccess", "success");
+      } catch (error) {
+        showMessage(error.message);
+      } finally {
+        if (button.isConnected) {
+          button.disabled = false;
+          button.textContent = t("refresh");
+        }
+      }
+    }
+
+    async function deleteNetwork(networkId, button) {
+      if (!window.confirm(t("confirmDelete"))) return;
+      errorMessage.hidden = true;
+      button.disabled = true;
+      button.textContent = t("deleting");
+      try {
+        await api("/api/inventory/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ networkId })
+        });
+        if (await loadInventory()) showMessage("deleteSuccess", "success");
+      } catch (error) {
+        showMessage(error.message);
+      } finally {
+        if (button.isConnected) {
+          button.disabled = false;
+          button.textContent = t("deleteInventory");
+        }
+      }
+    }
+
+    loadInventory();
 
     document.getElementById("language-toggle").addEventListener("click", () => {
       language = language === "fr" ? "en" : "fr";
