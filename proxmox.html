@@ -96,7 +96,7 @@
         <div><h2 id="connection-title" data-i18n="connectionTitle">Proxmox VE connection</h2><p class="hint" data-i18n="connectionDescription">Enter an API token for a user with read-only audit permissions.</p></div>
         <span class="status" id="connection-status"><span class="dot"></span><span id="status-label">Disconnected</span></span>
       </div>
-      <form id="connect-form" autocomplete="off">
+      <form id="connect-form" method="post" action="/api/proxmox/connect" autocomplete="off">
         <div class="form-grid">
           <label class="field field-wide"><span data-i18n="baseUrl">Proxmox URL</span><input id="base-url" name="baseUrl" type="url" placeholder="https://pve.example.com:8006" autocomplete="url" required></label>
           <label class="field"><span data-i18n="username">User name</span><input id="username" name="username" type="text" placeholder="inventory" autocomplete="off" required></label>
@@ -241,7 +241,7 @@
       const parts = [];
       if (version.version) parts.push(`<strong>${t("version")}:</strong> ${escapeHtml(version.version)}`);
       if (version.release) parts.push(`<strong>${t("release")}:</strong> ${escapeHtml(version.release)}`);
-      $("version").innerHTML = parts.join(" <span aria-hidden="true">·</span> ");
+      $("version").innerHTML = parts.join(' <span aria-hidden="true">·</span> ');
       const nodes = $("nodes");
       nodes.replaceChildren();
       if (!connection.nodes || connection.nodes.length === 0) {

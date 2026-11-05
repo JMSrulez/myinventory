@@ -321,6 +321,17 @@ def capture_one_network(network: dict[str, str]) -> dict[str, Any]:
 class Handler(BaseHTTPRequestHandler):
     server_version = "MerakiInventory/0.1"
 
+    def log_message(self, format: str, *args: Any) -> None:
+        # Access logs must not retain query parameters, which can contain secrets
+        # when a browser submits a form with GET.
+        if args and isinstance(args[0], str):
+            method, separator, remainder = args[0].partition(" ")
+            target, target_separator, version = remainder.partition(" ")
+            if separator and target_separator:
+                safe_request_line = method + " " + target.split("?", 1)[0] + " " + version
+                args = (safe_request_line, *args[1:])
+        super().log_message(format, *args)
+
     def is_local_request(self) -> bool:
         host_header = self.headers.get("Host", "")
         try:
@@ -366,6 +377,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         if not self.is_local_request():
             self.send_json(403, {"error": "Accès local uniquement."})
+            return
+        if self.path.startswith("/proxmox?"):
+            self.send_json(405, {
+                "error": "Credentials must not be sent in the URL. Reload the page and submit the form again."
+            })
             return
         if self.path == "/inventory":
             page = (APP_DIR / "inventory.html").read_bytes()
