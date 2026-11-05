@@ -52,8 +52,10 @@ Python 3.10 ou plus récent est requis. Aucun paquet tiers n’est nécessaire. 
 ## Phase 2
 
 - capture des équipements des réseaux sélectionnés depuis l’API Meraki;
-- stockage du nom, modèle, numéro de série et IP de gestion (`lanIp`) de chaque équipement;
-- consultation de l’inventaire dans un onglet par réseau depuis la page Inventaire.
+- stockage du nom, modèle, numéro de série, IP de gestion (lanIp), version actuelle et statut de chaque équipement;
+- consultation des données dans un onglet par réseau depuis la page Inventaire.
+
+La lecture du statut requiert le scope dashboard:general:telemetry:read. Meraki actualise ces disponibilités environ toutes les cinq minutes.
 
 La base SQLite est stockée dans `./data/inventory.sqlite3` sur l’hôte et montée dans le conteneur sous `/data`. Elle reste donc dans le dossier du projet quand le conteneur est supprimé ou recréé. Le dossier `data/` est exclu de Git.
 

@@ -11,7 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, urljoin, urlsplit
+from urllib.parse import quote, urlencode, urljoin, urlsplit
 from urllib.request import Request, urlopen
 
 API_ROOT = "https://api.meraki.com/api/v1/"
@@ -58,9 +58,18 @@ def initialize_inventory_database() -> None:
                 model TEXT NOT NULL,
                 serial TEXT NOT NULL,
                 management_ip TEXT NOT NULL,
+                current_version TEXT,
+                status TEXT,
                 PRIMARY KEY (network_id, device_key)
             );
         """)
+        columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(inventory_devices)")
+        }
+        if "current_version" not in columns:
+            connection.execute("ALTER TABLE inventory_devices ADD COLUMN current_version TEXT")
+        if "status" not in columns:
+            connection.execute("ALTER TABLE inventory_devices ADD COLUMN status TEXT")
 
 
 def read_inventory() -> list[dict[str, Any]]:
@@ -72,7 +81,7 @@ def read_inventory() -> list[dict[str, Any]]:
         result = []
         for network in networks:
             devices = connection.execute(
-                "SELECT name, model, serial, management_ip FROM inventory_devices "
+                "SELECT name, model, serial, management_ip, current_version, status FROM inventory_devices "
                 "WHERE network_id = ? ORDER BY name COLLATE NOCASE, serial",
                 (network["network_id"],),
             ).fetchall()
@@ -115,12 +124,13 @@ def store_inventory(networks: list[dict[str, Any]]) -> int:
                 device_key = serial or str(device.get("mac") or "") or "device-" + str(index)
                 connection.execute(
                     "INSERT INTO inventory_devices "
-                    "(network_id, device_key, name, model, serial, management_ip) "
-                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    "(network_id, device_key, name, model, serial, management_ip, current_version, status) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         network["id"], device_key, str(device.get("name") or ""),
                         str(device.get("model") or ""), serial,
                         str(device.get("lanIp") or device.get("managementIp") or ""),
+                        str(device.get("firmware") or ""), str(device.get("status") or ""),
                     ),
                 )
                 device_count += 1
@@ -354,12 +364,37 @@ class Handler(BaseHTTPRequestHandler):
                 return
             captured_networks: list[dict[str, Any]] = []
             try:
+                status_by_org: dict[str, dict[str, str]] = {}
+                for network_id in selected_ids:
+                    source = NETWORKS[network_id]
+                    organization_id = str(source.get("organizationId", ""))
+                    if organization_id in status_by_org:
+                        continue
+                    organization_network_ids = [
+                        selected_id for selected_id in selected_ids
+                        if str(NETWORKS[selected_id].get("organizationId", "")) == organization_id
+                    ]
+                    query = urlencode([
+                        ("perPage", "1000"),
+                        *[("networkIds[]", selected_id) for selected_id in organization_network_ids],
+                    ])
+                    availability = meraki_get(
+                        "organizations/" + quote(organization_id, safe="")
+                        + "/devices/availabilities?" + query
+                    )
+                    status_by_org[organization_id] = {
+                        str(item.get("serial")): str(item.get("status") or "")
+                        for item in availability if item.get("serial")
+                    }
                 for network_id in selected_ids:
                     source = NETWORKS[network_id]
                     devices = meraki_get(
                         "networks/" + quote(network_id, safe="") + "/devices"
                     )
                     organization_id = str(source.get("organizationId", ""))
+                    device_statuses = status_by_org.get(organization_id, {})
+                    for device in devices:
+                        device["status"] = device_statuses.get(str(device.get("serial") or ""), "")
                     organization = next(
                         (item for item in ORGANIZATIONS if str(item.get("id", "")) == organization_id),
                         {},

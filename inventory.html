@@ -48,6 +48,10 @@
     th { background: #f8faf8; color: #64736d; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
     tbody tr:last-child td { border-bottom: 0; }
     td { color: #26352e; }
+    .status-badge { display: inline-flex; padding: 4px 8px; border-radius: 999px; background: #f0f3f1; color: #46564f; font-size: 11px; font-weight: 700; white-space: nowrap; }
+    .status-online { background: #e6f4eb; color: #17613d; }
+    .status-offline, .status-alerting { background: #fff0ed; color: #a63e39; }
+    .status-dormant { background: #fff5df; color: #78540c; }
     .empty { display: grid; min-height: 220px; place-items: center; padding: 32px; color: #89958f; text-align: center; }
     .empty-inner { max-width: 380px; }
     .empty strong { display: block; margin-bottom: 7px; color: #46564f; font-size: 14px; font-weight: 650; }
@@ -107,6 +111,8 @@
         noNetworkName: "Unnamed network", organization: "Organization", capturedOn: "Captured on",
         device: "device", devices: "devices", noDevices: "No devices were returned for this network.",
         name: "Name", model: "Model", serialNumber: "Serial number", managementIp: "Management IP",
+        currentVersion: "Current version", status: "Status", statusOnline: "Online", statusOffline: "Offline",
+        statusAlerting: "Alerting", statusDormant: "Dormant",
         httpError: "HTTP error {status}", errReadInventory: "Could not read the saved inventory.", errLocalOnly: "Local access only.",
         errPageNotFound: "Page not found."
       },
@@ -119,6 +125,8 @@
         noNetworkName: "Réseau sans nom", organization: "Organisation", capturedOn: "Capturé le",
         device: "équipement", devices: "équipements", noDevices: "Aucun équipement n’a été renvoyé pour ce réseau.",
         name: "Nom", model: "Modèle", serialNumber: "Numéro de série", managementIp: "IP de gestion",
+        currentVersion: "Version actuelle", status: "Statut", statusOnline: "En ligne", statusOffline: "Hors ligne",
+        statusAlerting: "En alerte", statusDormant: "Inactif",
         httpError: "Erreur HTTP {status}", errReadInventory: "Impossible de lire l’inventaire enregistré.", errLocalOnly: "Accès local uniquement.",
         errPageNotFound: "Page introuvable."
       }
@@ -207,7 +215,7 @@
       const table = document.createElement("table");
       const head = document.createElement("thead");
       const headerRow = document.createElement("tr");
-      for (const label of ["name", "model", "serialNumber", "managementIp"]) {
+      for (const label of ["name", "model", "serialNumber", "managementIp", "currentVersion", "status"]) {
         const cell = document.createElement("th");
         cell.scope = "col";
         cell.textContent = t(label);
@@ -217,11 +225,25 @@
       const body = document.createElement("tbody");
       for (const device of network.devices) {
         const row = document.createElement("tr");
-        for (const value of [device.name, device.model, device.serial, device.management_ip]) {
+        for (const value of [device.name, device.model, device.serial, device.management_ip, device.current_version]) {
           const cell = document.createElement("td");
           cell.textContent = value || "—";
           row.append(cell);
         }
+        const statusCell = document.createElement("td");
+        const status = (device.status || "").toLowerCase();
+        const statusLabels = {
+          online: "statusOnline", offline: "statusOffline", alerting: "statusAlerting", dormant: "statusDormant"
+        };
+        if (status) {
+          const badge = document.createElement("span");
+          badge.className = "status-badge" + (["online", "offline", "alerting", "dormant"].includes(status) ? " status-" + status : "");
+          badge.textContent = statusLabels[status] ? t(statusLabels[status]) : status;
+          statusCell.append(badge);
+        } else {
+          statusCell.textContent = "—";
+        }
+        row.append(statusCell);
         body.append(row);
       }
       table.append(head, body);
