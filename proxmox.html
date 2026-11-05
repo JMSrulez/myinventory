@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f7f5">
+  <title>Proxmox connection · Meraki Inventory</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172521; --muted: #64736d; --line: #e2e8e4;
+      --green: #187653; --green-dark: #105a3e; --paper: #fff;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { margin: 0; min-height: 100vh; background: #f5f7f5; color: var(--ink); }
+    .shell { max-width: 1000px; margin: auto; padding: 38px 28px 64px; }
+    header { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 30px; }
+    .brand { display: flex; align-items: center; gap: 14px; }
+    .brand-mark { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 13px; background: #dceee2; color: var(--green-dark); }
+    .brand-mark svg { width: 24px; height: 24px; }
+    .eyebrow { margin: 0 0 5px; color: var(--green); font-size: 11px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(24px, 3vw, 32px); letter-spacing: -.04em; font-weight: 680; }
+    .header-actions { display: flex; align-items: flex-start; gap: 10px; }
+    .site-nav { display: flex; gap: 5px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: white; }
+    .nav-link { padding: 7px 10px; border-radius: 7px; color: var(--muted); font-size: 12px; font-weight: 650; text-decoration: none; white-space: nowrap; }
+    .nav-link:hover { color: var(--green-dark); background: #f6f8f6; }
+    .nav-link[aria-current="page"] { background: #eaf4ed; color: var(--green-dark); }
+    .language-toggle { min-height: 36px; padding: 0 11px; border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--ink); font-size: 12px; font-weight: 650; cursor: pointer; }
+    .intro { max-width: 760px; margin: 0 0 25px; color: var(--muted); line-height: 1.65; font-size: 15px; }
+    .card { border: 1px solid var(--line); border-radius: 14px; background: var(--paper); box-shadow: 0 3px 14px #193c2910; }
+    .connection-card, .result-card { padding: 22px; }
+    .section-heading, .result-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 17px; }
+    h2 { margin: 0; font-size: 18px; font-weight: 680; letter-spacing: -.015em; }
+    h3 { margin: 0; font-size: 14px; }
+    .hint { margin: 6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .field { display: grid; gap: 6px; color: #46564f; font-size: 12px; font-weight: 650; }
+    .field-hint { color: var(--muted); font-size: 11px; font-weight: 400; line-height: 1.4; }
+    .field input { width: 100%; min-height: 42px; padding: 0 12px; border: 1px solid #d5ded8; border-radius: 8px; background: white; color: var(--ink); font: inherit; font-size: 14px; }
+    .field input:focus { outline: 3px solid #dceee2; border-color: var(--green); }
+    .field-wide { grid-column: 1 / -1; }
+    .form-actions { display: flex; gap: 9px; margin-top: 17px; }
+    .button { min-height: 40px; padding: 0 15px; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
+    .button:disabled { opacity: .6; cursor: wait; }
+    .button-primary { border-color: var(--green); background: var(--green); color: white; }
+    .button-primary:hover:not(:disabled) { background: var(--green-dark); }
+    .button-secondary { background: white; color: var(--ink); }
+    .button-secondary:hover:not(:disabled) { background: #f6f8f6; }
+    .note { margin: 16px 0 0; padding: 12px 14px; border-radius: 9px; background: #f5f8f6; color: var(--muted); font-size: 12px; line-height: 1.55; }
+    .message { margin: 0 0 18px; padding: 12px 15px; border: 1px solid #f0cfcb; border-radius: 9px; background: #fff7f6; color: #a63e39; font-size: 13px; line-height: 1.5; }
+    .message.success { border-color: #cce5d3; background: #f0f8f2; color: #17613d; }
+    .status { display: inline-flex; align-items: center; gap: 7px; color: #65756c; font-size: 12px; font-weight: 650; white-space: nowrap; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #9aa69f; }
+    .status.connected { color: #17613d; }
+    .status.connected .dot { background: #2b9a5d; }
+    .result-card { margin-top: 18px; }
+    .version { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 19px; color: var(--muted); font-size: 13px; }
+    .version strong { color: var(--ink); }
+    .nodes { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; margin-top: 10px; }
+    .node { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 9px; }
+    .node-name { overflow: hidden; font-size: 13px; font-weight: 650; text-overflow: ellipsis; }
+    .node-status { padding: 4px 8px; border-radius: 999px; background: #f0f3f1; color: #46564f; font-size: 11px; font-weight: 700; }
+    .node-status.online { background: #e6f4eb; color: #17613d; }
+    .empty { padding: 24px; color: var(--muted); font-size: 13px; text-align: center; }
+    @media (max-width: 700px) {
+      .shell { padding: 25px 16px 45px; }
+      header { align-items: flex-start; flex-direction: column; margin-bottom: 20px; }
+      .header-actions { width: 100%; justify-content: space-between; }
+      .site-nav { overflow-x: auto; }
+    }
+    @media (max-width: 520px) { .form-grid { grid-template-columns: 1fr; } .field-wide { grid-column: auto; } .connection-card, .result-card { padding: 17px; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5a12 12 0 0 1 16 0M7 13.5a7.5 7.5 0 0 1 10 0M10 16.5a3 3 0 0 1 4 0M12 20h.01"/><path d="M5 4.5h14v15H5z" opacity=".15"/></svg></div>
+        <div><p class="eyebrow" data-i18n="brandEyebrow">Network tools</p><h1 data-i18n="brandTitle">Meraki Inventory</h1></div>
+      </div>
+      <div class="header-actions">
+        <nav class="site-nav" aria-label="Main navigation" data-i18n-aria-label="mainNavigation">
+          <a class="nav-link" href="/" data-i18n="navSetup">Setup</a>
+          <a class="nav-link" href="/inventory" data-i18n="navInventory">Inventory</a>
+          <a class="nav-link" href="/proxmox" aria-current="page" data-i18n="navProxmox">Proxmox</a>
+        </nav>
+        <button class="language-toggle" id="language-toggle" type="button">Français</button>
+      </div>
+    </header>
+    <p class="intro" data-i18n="intro">Connect to a Proxmox VE server to check the API credentials and view its version and nodes.</p>
+    <div class="message" id="message" role="alert" hidden></div>
+    <section class="card connection-card" aria-labelledby="connection-title">
+      <div class="section-heading">
+        <div><h2 id="connection-title" data-i18n="connectionTitle">Proxmox VE connection</h2><p class="hint" data-i18n="connectionDescription">Enter an API token for a user with read-only audit permissions.</p></div>
+        <span class="status" id="connection-status"><span class="dot"></span><span id="status-label">Disconnected</span></span>
+      </div>
+      <form id="connect-form" autocomplete="off">
+        <div class="form-grid">
+          <label class="field field-wide"><span data-i18n="baseUrl">Proxmox URL</span><input id="base-url" name="baseUrl" type="url" placeholder="https://pve.example.com:8006" autocomplete="url" required></label>
+          <label class="field"><span data-i18n="username">User name</span><input id="username" name="username" type="text" placeholder="inventory" autocomplete="off" required></label>
+          <label class="field"><span data-i18n="realm">Realm</span><input id="realm" name="realm" type="text" value="pve" placeholder="pve" autocomplete="off" required></label>
+          <label class="field"><span data-i18n="tokenId">API token ID</span><input id="token-id" name="tokenId" type="text" placeholder="readonly" autocomplete="off" required><small class="field-hint" data-i18n="tokenIdHint">Token ID only, without the user or realm.</small></label>
+          <label class="field"><span data-i18n="tokenSecret">API token secret</span><input id="token-secret" name="tokenSecret" type="password" autocomplete="new-password" required></label>
+        </div>
+        <div class="form-actions">
+          <button class="button button-primary" id="connect-button" type="submit" data-i18n="connect">Connect</button>
+          <button class="button button-secondary" id="disconnect-button" type="button" hidden data-i18n="disconnect">Disconnect</button>
+        </div>
+      </form>
+      <p class="note" data-i18n="credentialNote">The token is kept in server memory only and is cleared when you disconnect or restart the application. The server connects to Proxmox over HTTPS and verifies its certificate.</p>
+    </section>
+    <section class="card result-card" id="result-card" aria-labelledby="result-title" hidden>
+      <div class="result-heading"><div><h2 id="result-title" data-i18n="serverDetails">Server details</h2><p class="hint" id="server-identity"></p></div></div>
+      <p class="version" id="version"></p>
+      <h3 data-i18n="nodes">Nodes</h3>
+      <div class="nodes" id="nodes"></div>
+    </section>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const translations = {
+      en: {
+        brandEyebrow: "Network tools", brandTitle: "Meraki Inventory", mainNavigation: "Main navigation",
+        navSetup: "Setup", navInventory: "Inventory", navProxmox: "Proxmox", pageTitle: "Proxmox connection · Meraki Inventory",
+        intro: "Connect to a Proxmox VE server to check the API credentials and view its version and nodes.",
+        connectionTitle: "Proxmox VE connection", connectionDescription: "Enter an API token for a user with read-only audit permissions.",
+        baseUrl: "Proxmox URL", username: "User name", realm: "Realm", tokenId: "API token ID", tokenIdHint: "Token ID only, without the user or realm.", tokenSecret: "API token secret",
+        connect: "Connect", connecting: "Connecting…", disconnect: "Disconnect", connected: "Connected", disconnected: "Disconnected",
+        credentialNote: "Use this page on a trusted network unless the application is behind HTTPS. The token stays in server memory and is cleared on disconnect or restart. The server connects to Proxmox over HTTPS and verifies its certificate.",
+        serverDetails: "Server details", nodes: "Nodes", version: "Version", release: "Release", noNodes: "No nodes were returned.", nodeUnknown: "Unknown",
+        noNodeName: "Unnamed node", nodeOnline: "Online", nodeOffline: "Offline", connectedMessage: "Proxmox connection verified.",
+        errLocalOnly: "Local access only.", errPageNotFound: "Page not found.", errInvalidJson: "Invalid JSON request.",
+        errRequired: "Enter the Proxmox URL and all API token fields.", errUrl: "Enter a valid HTTPS Proxmox URL.",
+        errUrlDetails: "Enter a valid HTTPS Proxmox URL without credentials, query, or fragment.",
+        errUsername: "Enter a valid Proxmox username.", errRealm: "Enter a valid Proxmox realm.", errTokenId: "Enter a valid Proxmox token ID.",
+        errTokenSecret: "Enter a valid API token secret.", errAuth: "Proxmox rejected the API token. Check its ID, secret, and permissions.",
+        errHttp: "Proxmox returned HTTP {status}.", errReach: "Could not securely reach the Proxmox API. Check the URL, certificate, and connection.",
+        errJson: "Proxmox returned invalid JSON.", errResponse: "Unexpected Proxmox API response."
+      },
+      fr: {
+        brandEyebrow: "Outils réseau", brandTitle: "Inventaire Meraki", mainNavigation: "Navigation principale",
+        navSetup: "Setup", navInventory: "Inventaire", navProxmox: "Proxmox", pageTitle: "Connexion Proxmox · Inventaire Meraki",
+        intro: "Connectez-vous à un serveur Proxmox VE pour vérifier le jeton API et afficher sa version ainsi que ses nœuds.",
+        connectionTitle: "Connexion à Proxmox VE", connectionDescription: "Saisissez un jeton API associé à un utilisateur disposant de droits d’audit en lecture seule.",
+        baseUrl: "URL Proxmox", username: "Nom d’utilisateur", realm: "Realm", tokenId: "ID du jeton API", tokenIdHint: "Saisissez uniquement l’ID, sans l’utilisateur ni le realm.", tokenSecret: "Secret du jeton API",
+        connect: "Connecter", connecting: "Connexion…", disconnect: "Déconnecter", connected: "Connecté", disconnected: "Déconnecté",
+        credentialNote: "Utilisez cette page sur un réseau de confiance, sauf si l’application est accessible en HTTPS. Le jeton reste en mémoire sur le serveur et disparaît à la déconnexion ou au redémarrage. Le serveur contacte Proxmox en HTTPS et vérifie son certificat.",
+        serverDetails: "Détails du serveur", nodes: "Nœuds", version: "Version", release: "Édition", noNodes: "Aucun nœud n’a été renvoyé.", nodeUnknown: "Inconnu",
+        noNodeName: "Nœud sans nom", nodeOnline: "En ligne", nodeOffline: "Hors ligne", connectedMessage: "Connexion Proxmox vérifiée.",
+        errLocalOnly: "Accès local uniquement.", errPageNotFound: "Page introuvable.", errInvalidJson: "Requête JSON invalide.",
+        errRequired: "Saisissez l’URL Proxmox et tous les champs du jeton API.", errUrl: "Saisissez une URL Proxmox HTTPS valide.",
+        errUrlDetails: "Saisissez une URL HTTPS valide sans identifiants, paramètres ni fragment.",
+        errUsername: "Saisissez un nom d’utilisateur Proxmox valide.", errRealm: "Saisissez un realm Proxmox valide.", errTokenId: "Saisissez un ID de jeton Proxmox valide.",
+        errTokenSecret: "Saisissez un secret de jeton API valide.", errAuth: "Proxmox a refusé le jeton API. Vérifiez son ID, son secret et ses permissions.",
+        errHttp: "Proxmox a renvoyé l’erreur HTTP {status}.", errReach: "Impossible de joindre l’API Proxmox de façon sécurisée. Vérifiez l’URL, le certificat et la connexion.",
+        errJson: "Proxmox a renvoyé un JSON invalide.", errResponse: "Réponse inattendue de l’API Proxmox."
+      }
+    };
+    const errorMap = {
+      "Accès local uniquement.": "errLocalOnly", "Page introuvable.": "errPageNotFound", "Requête JSON invalide.": "errInvalidJson",
+      "Saisissez l’URL Proxmox et tous les champs du jeton API.": "errRequired", "Saisissez une URL HTTPS Proxmox valide.": "errUrl",
+      "Saisissez une URL HTTPS valide sans identifiants, paramètres ni fragment.": "errUrlDetails",
+      "Saisissez un nom d’utilisateur Proxmox valide.": "errUsername", "Saisissez un realm Proxmox valide.": "errRealm",
+      "Saisissez un ID de jeton Proxmox valide.": "errTokenId", "Saisissez un secret de jeton API valide.": "errTokenSecret",
+      "Proxmox a refusé le jeton API. Vérifiez son ID, son secret et ses permissions.": "errAuth",
+      "Impossible de joindre l’API Proxmox de façon sécurisée. Vérifiez l’URL, le certificat et la connexion.": "errReach",
+      "Proxmox a renvoyé un JSON invalide.": "errJson", "Réponse inattendue de l’API Proxmox.": "errResponse"
+    };
+    Object.assign(errorMap, {
+      "Local access only.": "errLocalOnly", "Page not found.": "errPageNotFound", "Invalid JSON request.": "errInvalidJson",
+      "Enter the Proxmox URL and all API token fields.": "errRequired", "Enter a valid HTTPS Proxmox URL.": "errUrl",
+      "Enter a valid HTTPS Proxmox URL without credentials, query, or fragment.": "errUrlDetails",
+      "Enter a valid Proxmox username.": "errUsername", "Enter a valid Proxmox realm.": "errRealm",
+      "Enter a valid Proxmox token ID.": "errTokenId", "Enter a valid API token secret.": "errTokenSecret",
+      "Proxmox rejected the API token. Check its ID, secret, and permissions.": "errAuth",
+      "Could not securely reach the Proxmox API. Check the URL, certificate, and connection.": "errReach",
+      "Proxmox returned invalid JSON.": "errJson", "Unexpected Proxmox API response.": "errResponse"
+    });
+    function detectLanguage() {
+      try { const saved = localStorage.getItem("meraki-inventory-language"); if (saved === "en" || saved === "fr") return saved; } catch (_) {}
+      const browserLanguage = (navigator.languages && navigator.languages[0]) || navigator.language || "";
+      return /^fr(?:-|$)/i.test(browserLanguage) ? "fr" : "en";
+    }
+    let language = detectLanguage();
+    const t = (key, values = {}) => Object.entries(values).reduce((text, [name, value]) => text.replaceAll(`{${name}}`, String(value)), translations[language][key] || key);
+    let connection = null;
+    function applyTranslations() {
+      document.documentElement.lang = language;
+      document.title = t("pageTitle");
+      document.querySelectorAll("[data-i18n]").forEach((element) => { element.textContent = t(element.dataset.i18n); });
+      document.querySelectorAll("[data-i18n-aria-label]").forEach((element) => { element.setAttribute("aria-label", t(element.dataset.i18nAriaLabel)); });
+      $("language-toggle").textContent = language === "fr" ? "English" : "Français";
+      $("language-toggle").setAttribute("aria-label", language === "fr" ? "Passer la langue en anglais" : "Switch language to French");
+      if (!connection) $("status-label").textContent = t("disconnected");
+      if (connection) renderConnection(connection);
+      if ($("message").dataset.rawError) $("message").textContent = translatedError(new Error($("message").dataset.rawError));
+      else if ($("message").dataset.successKey) $("message").textContent = t($("message").dataset.successKey);
+    }
+    function showMessage(message, success = false) {
+      const element = $("message");
+      delete element.dataset.rawError;
+      delete element.dataset.successKey;
+      element.textContent = message;
+      element.classList.toggle("success", success);
+      element.hidden = false;
+    }
+    function showError(error) {
+      showMessage(translatedError(error));
+      $("message").dataset.rawError = error.message;
+    }
+    async function api(path, body) {
+      const response = await fetch(path, {
+        method: body === undefined ? "GET" : "POST",
+        headers: body === undefined ? {} : { "Content-Type": "application/json" },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        cache: "no-store"
+      });
+      let payload;
+      try { payload = await response.json(); } catch (_) { throw new Error(t("errResponse")); }
+      if (!response.ok) throw new Error(payload.error || t("errHttp", { status: response.status }));
+      return payload;
+    }
+    function translatedError(error) {
+      const message = errorMap[error.message];
+      if (message) return t(message);
+      const match = /^Proxmox returned HTTP (\d+)\.$/.exec(error.message);
+      return match ? t("errHttp", { status: match[1] }) : error.message;
+    }
+    function renderConnection(data) {
+      connection = data && data.connected ? data : null;
+      const status = $("connection-status");
+      status.classList.toggle("connected", Boolean(connection));
+      $("status-label").textContent = connection ? t("connected") : t("disconnected");
+      $("disconnect-button").hidden = !connection;
+      $("result-card").hidden = !connection;
+      if (!connection) return;
+      $("server-identity").textContent = `${connection.baseUrl} · ${connection.username}`;
+      const version = connection.version || {};
+      const parts = [];
+      if (version.version) parts.push(`<strong>${t("version")}:</strong> ${escapeHtml(version.version)}`);
+      if (version.release) parts.push(`<strong>${t("release")}:</strong> ${escapeHtml(version.release)}`);
+      $("version").innerHTML = parts.join(" <span aria-hidden="true">·</span> ");
+      const nodes = $("nodes");
+      nodes.replaceChildren();
+      if (!connection.nodes || connection.nodes.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = t("noNodes");
+        nodes.append(empty);
+      } else {
+        for (const node of connection.nodes) {
+          const item = document.createElement("div");
+          item.className = "node";
+          const name = document.createElement("span");
+          name.className = "node-name";
+          name.textContent = node.node || t("noNodeName");
+          const state = document.createElement("span");
+          state.className = "node-status" + (node.status === "online" ? " online" : "");
+          const statusLabels = { online: t("nodeOnline"), offline: t("nodeOffline"), unknown: t("nodeUnknown") };
+          state.textContent = statusLabels[node.status] || node.status || t("nodeUnknown");
+          item.append(name, state);
+          nodes.append(item);
+        }
+      }
+    }
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[character]);
+    }
+    $("connect-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const button = $("connect-button");
+      button.disabled = true;
+      button.textContent = t("connecting");
+      $("message").hidden = true;
+      try {
+        const data = await api("/api/proxmox/connect", {
+          baseUrl: $("base-url").value,
+          username: $("username").value,
+          realm: $("realm").value,
+          tokenId: $("token-id").value,
+          tokenSecret: $("token-secret").value
+        });
+        $("token-secret").value = "";
+        renderConnection(data);
+        showMessage(t("connectedMessage"), true);
+        $("message").dataset.successKey = "connectedMessage";
+      } catch (error) {
+        showError(error);
+      } finally {
+        button.disabled = false;
+        button.textContent = t("connect");
+      }
+    });
+    $("disconnect-button").addEventListener("click", async () => {
+      try {
+        await api("/api/proxmox/disconnect", {});
+        renderConnection(null);
+        $("token-secret").value = "";
+        $("message").hidden = true;
+      } catch (error) { showError(error); }
+    });
+    $("language-toggle").addEventListener("click", () => {
+      language = language === "fr" ? "en" : "fr";
+      try { localStorage.setItem("meraki-inventory-language", language); } catch (_) {}
+      applyTranslations();
+    });
+    applyTranslations();
+    api("/api/proxmox/status").then(renderConnection).catch(showError);
+  </script>
+</body>
+</html>

@@ -59,6 +59,12 @@ La lecture du statut requiert le scope dashboard:general:telemetry:read. Meraki 
 
 La base SQLite est stockée dans `./data/inventory.sqlite3` sur l’hôte et montée dans le conteneur sous `/data`. Elle reste donc dans le dossier du projet quand le conteneur est supprimé ou recréé. Le dossier `data/` est exclu de Git.
 
+## Connexion Proxmox VE
+
+Ouvrez `/proxmox` depuis la navigation, puis renseignez l’URL HTTPS du serveur, le nom d’utilisateur, le realm, l’ID du jeton et son secret. Par exemple, pour `inventory@pve!readonly`, entrez `inventory`, `pve` et `readonly` dans les trois champs correspondants. Le secret doit être celui créé dans Proxmox pour ce jeton.
+
+La page valide le jeton avec les points d’accès de lecture de la version et des nœuds, puis affiche leur résultat. Le jeton reste en mémoire sur le serveur et disparaît à la déconnexion ou au redémarrage. Le certificat HTTPS de Proxmox doit être approuvé par la machine qui exécute l’application. Aucun secret Proxmox n’est écrit dans la base SQLite. Utilisez cette page sur un réseau de confiance ou derrière un proxy HTTPS : la connexion navigateur vers l’application peut être en HTTP.
+
 Lors du passage depuis l’ancienne configuration qui utilisait un volume Docker nommé, copiez d’abord la base existante avant de récupérer cette version, afin de conserver l’inventaire :
 
     docker compose stop meraki-inventory

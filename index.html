@@ -111,6 +111,7 @@
         <nav class="site-nav" aria-label="Navigation principale" data-i18n-aria-label="mainNavigation">
           <a class="nav-link" href="/" aria-current="page" data-i18n="navSetup">Setup</a>
           <a class="nav-link" href="/inventory" data-i18n="navInventory">Inventaire</a>
+          <a class="nav-link" href="/proxmox" data-i18n="navProxmox">Proxmox</a>
         </nav>
         <button class="language-toggle" id="language-toggle" type="button">English</button>
       </div>
@@ -161,7 +162,7 @@
     const translations = {
       en: {
         brandEyebrow: "Network tools", brandTitle: "Meraki Inventory", mainNavigation: "Main navigation",
-        navSetup: "Setup", navInventory: "Inventory", setupTitle: "Setup · Meraki Inventory",
+        navSetup: "Setup", navInventory: "Inventory", navProxmox: "Proxmox", setupTitle: "Setup · Meraki Inventory",
         setupIntro: "Connect to the Meraki Dashboard, choose the organizations and networks to inventory, then capture the selected devices.",
         connectionTitle: "Dashboard connection", connectionDescription: "Use a Meraki API key with permission to view organizations and networks.",
         configuredDescription: "The API key is provided by the server configuration.", connected: "Connected",
@@ -194,7 +195,7 @@
       },
       fr: {
         brandEyebrow: "Outils réseau", brandTitle: "Inventaire Meraki", mainNavigation: "Navigation principale",
-        navSetup: "Setup", navInventory: "Inventaire", setupTitle: "Setup · Inventaire Meraki",
+        navSetup: "Setup", navInventory: "Inventaire", navProxmox: "Proxmox", setupTitle: "Setup · Inventaire Meraki",
         setupIntro: "Connectez-vous au Dashboard Meraki, choisissez les organisations et les réseaux à inventorier, puis capturez les équipements sélectionnés.",
         connectionTitle: "Connexion au Dashboard", connectionDescription: "Utilisez une clé API Meraki autorisée à consulter les organisations et les réseaux.",
         configuredDescription: "La clé API est fournie par la configuration du serveur.", connected: "Connecté",

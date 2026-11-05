@@ -7,7 +7,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     MERAKI_INVENTORY_DATABASE=/data/inventory.sqlite3
 
 WORKDIR /app
-COPY app.py index.html inventory.html ./
+COPY app.py index.html inventory.html proxmox.html ./
 RUN mkdir -p /data && chown 10001:10001 /data
 
 USER 10001:10001

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode, urljoin, urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 
 API_ROOT = "https://api.meraki.com/api/v1/"
 APP_DIR = Path(__file__).resolve().parent
@@ -23,6 +23,8 @@ API_KEY: str | None = None
 CONFIGURED_API_KEY: str | None = None
 ORGANIZATIONS: list[dict[str, Any]] = []
 NETWORKS: dict[str, dict[str, Any]] = {}
+PROXMOX_SESSION: dict[str, str] | None = None
+PROXMOX_INFO: dict[str, Any] | None = None
 
 
 def load_configured_api_key() -> str | None:
@@ -168,6 +170,71 @@ class MerakiError(Exception):
     pass
 
 
+class ProxmoxError(Exception):
+    pass
+
+
+class NoRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(self, request: Request, response: Any, code: int,
+                         message: str, headers: Any, new_url: str) -> None:
+        # Never forward a Proxmox API token to a redirect target.
+        return None
+
+
+def proxmox_get(base_url: str, token_header: str, endpoint: str) -> dict[str, Any] | list[Any]:
+    request = Request(base_url + "/api2/json/" + endpoint, headers={
+        "Accept": "application/json",
+        "Authorization": token_header,
+        "User-Agent": "MerakiInventoryLocal/0.1",
+    })
+    try:
+        with build_opener(NoRedirectHandler()).open(request, timeout=15) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        if exc.code in (401, 403):
+            raise ProxmoxError("Proxmox rejected the API token. Check its ID, secret, and permissions.") from exc
+        raise ProxmoxError("Proxmox returned HTTP " + str(exc.code) + ".") from exc
+    except (URLError, TimeoutError, OSError) as exc:
+        raise ProxmoxError("Could not securely reach the Proxmox API. Check the URL, certificate, and connection.") from exc
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise ProxmoxError("Proxmox returned invalid JSON.") from exc
+    if not isinstance(payload, dict) or "data" not in payload:
+        raise ProxmoxError("Unexpected Proxmox API response.")
+    return payload["data"]
+
+
+def validate_proxmox_credentials(data: dict[str, Any]) -> tuple[str, str, str]:
+    base_url = data.get("baseUrl")
+    username = data.get("username")
+    realm = data.get("realm")
+    token_id = data.get("tokenId")
+    token_secret = data.get("tokenSecret")
+    if not all(isinstance(value, str) for value in (base_url, username, realm, token_id, token_secret)):
+        raise ValueError("Enter the Proxmox URL and all API token fields.")
+    base_url = base_url.strip().rstrip("/")
+    username, realm, token_id = username.strip(), realm.strip(), token_id.strip()
+    if not base_url or len(base_url) > 512 or any(char.isspace() for char in base_url):
+        raise ValueError("Enter a valid HTTPS Proxmox URL.")
+    try:
+        parsed = urlsplit(base_url)
+        _ = parsed.port
+    except ValueError as exc:
+        raise ValueError("Enter a valid HTTPS Proxmox URL.") from exc
+    if (parsed.scheme.lower() != "https" or not parsed.hostname or parsed.username or parsed.password
+            or parsed.query or parsed.fragment or any(part in (".", "..") for part in parsed.path.split("/"))):
+        raise ValueError("Enter a valid HTTPS Proxmox URL without credentials, query, or fragment.")
+    for label, value in (("username", username), ("realm", realm), ("token ID", token_id)):
+        if not value or len(value) > 128 or any(char in value for char in "@!/=\r\n") or any(char.isspace() for char in value):
+            raise ValueError("Enter a valid Proxmox " + label + ".")
+    if not token_secret or len(token_secret) > 4096 or "\r" in token_secret or "\n" in token_secret:
+        raise ValueError("Enter a valid API token secret.")
+    authority = parsed.netloc
+    path_prefix = parsed.path.rstrip("/")
+    normalized_url = "https://" + authority + path_prefix
+    token_header = "PVEAPIToken=" + username + "@" + realm + "!" + token_id + "=" + token_secret
+    return normalized_url, username + "@" + realm, token_header
+
+
 def meraki_get(path: str) -> list[dict[str, Any]]:
     """Fetch every page from a Meraki endpoint, following Link headers."""
     if not API_KEY:
@@ -309,6 +376,24 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(page)
             return
+        if self.path == "/proxmox":
+            page = (APP_DIR / "proxmox.html").read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(page)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(page)
+            return
+        if self.path == "/api/proxmox/status":
+            self.send_json(200, {
+                "connected": PROXMOX_SESSION is not None,
+                "baseUrl": PROXMOX_SESSION.get("baseUrl", "") if PROXMOX_SESSION else "",
+                "username": PROXMOX_SESSION.get("username", "") if PROXMOX_SESSION else "",
+                "version": PROXMOX_INFO.get("version", {}) if PROXMOX_INFO else {},
+                "nodes": PROXMOX_INFO.get("nodes", []) if PROXMOX_INFO else [],
+            })
+            return
         if self.path == "/api/status":
             self.send_json(200, {
                 "connected": API_KEY is not None,
@@ -334,7 +419,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(404, {"error": "Page introuvable."})
 
     def do_POST(self) -> None:
-        global API_KEY, ORGANIZATIONS, NETWORKS
+        global API_KEY, ORGANIZATIONS, NETWORKS, PROXMOX_SESSION, PROXMOX_INFO
         if not self.is_local_request():
             self.send_json(403, {"error": "Accès local uniquement."})
             return
@@ -342,6 +427,52 @@ class Handler(BaseHTTPRequestHandler):
             data = self.read_json()
         except ValueError as exc:
             self.send_json(400, {"error": str(exc)})
+            return
+        if self.path == "/api/proxmox/connect":
+            try:
+                base_url, username, token_header = validate_proxmox_credentials(data)
+                version = proxmox_get(base_url, token_header, "version")
+                nodes = proxmox_get(base_url, token_header, "nodes")
+                if not isinstance(version, dict) or not isinstance(nodes, list):
+                    raise ProxmoxError("Unexpected Proxmox API response.")
+                node_summary = [
+                    {
+                        "node": str(node.get("node") or ""),
+                        "status": str(node.get("status") or "unknown"),
+                        "maxcpu": node.get("maxcpu"),
+                        "maxmem": node.get("maxmem"),
+                    }
+                    for node in nodes if isinstance(node, dict)
+                ]
+            except ValueError as exc:
+                self.send_json(400, {"error": str(exc)})
+                return
+            except ProxmoxError as exc:
+                self.send_json(502, {"error": str(exc)})
+                return
+            PROXMOX_SESSION = {
+                "baseUrl": base_url,
+                "username": username,
+                "tokenHeader": token_header,
+            }
+            PROXMOX_INFO = {
+                "version": {
+                    "version": str(version.get("version") or ""),
+                    "release": str(version.get("release") or ""),
+                },
+                "nodes": node_summary,
+            }
+            self.send_json(200, {
+                "connected": True,
+                "baseUrl": base_url,
+                "username": username,
+                **PROXMOX_INFO,
+            })
+            return
+        if self.path == "/api/proxmox/disconnect":
+            PROXMOX_SESSION = None
+            PROXMOX_INFO = None
+            self.send_json(200, {"connected": False})
             return
         if self.path == "/api/connect":
             key = data.get("apiKey")
