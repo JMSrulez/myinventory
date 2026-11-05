@@ -15,7 +15,7 @@
     * { box-sizing: border-box; }
     [hidden] { display: none !important; }
     body { margin: 0; min-height: 100vh; background: #f5f7f5; color: var(--ink); }
-    .shell { max-width: 1000px; margin: auto; padding: 38px 28px 64px; }
+    .shell { max-width: 1500px; margin: auto; padding: 38px 28px 64px; }
     header { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 30px; }
     .brand { display: flex; align-items: center; gap: 14px; }
     .brand-mark { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 13px; background: #dceee2; color: var(--green-dark); }
@@ -64,6 +64,17 @@
     .node-status { padding: 4px 8px; border-radius: 999px; background: #f0f3f1; color: #46564f; font-size: 11px; font-weight: 700; }
     .node-status.online { background: #e6f4eb; color: #17613d; }
     .empty { padding: 24px; color: var(--muted); font-size: 13px; text-align: center; }
+    .inventory-section { margin-top: 24px; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 9px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+    th, td { padding: 10px 11px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: #f5f8f6; color: #46564f; font-size: 11px; font-weight: 700; }
+    tbody tr:last-child td { border-bottom: 0; }
+    td.wrap { min-width: 150px; white-space: normal; }
+    .inventory-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 18px 0 8px; }
+    .inventory-toolbar .hint { margin: 0; }
+    .inventory-section h3 { margin: 0 0 10px; }
+    .tag { display: inline-block; margin: 0 3px 3px 0; padding: 3px 6px; border-radius: 5px; background: #edf4ef; color: #315a45; font-size: 11px; }
     @media (max-width: 700px) {
       .shell { padding: 25px 16px 45px; }
       header { align-items: flex-start; flex-direction: column; margin-bottom: 20px; }
@@ -112,10 +123,15 @@
       <p class="note" data-i18n="credentialNote">The token is kept in server memory only and is cleared when you disconnect or restart the application. The server connects to Proxmox over HTTPS and verifies its certificate.</p>
     </section>
     <section class="card result-card" id="result-card" aria-labelledby="result-title" hidden>
-      <div class="result-heading"><div><h2 id="result-title" data-i18n="serverDetails">Server details</h2><p class="hint" id="server-identity"></p></div></div>
+      <div class="result-heading"><div><h2 id="result-title" data-i18n="inventoryTitle">Proxmox inventory</h2><p class="hint" id="server-identity"></p></div></div>
       <p class="version" id="version"></p>
-      <h3 data-i18n="nodes">Nodes</h3>
-      <div class="nodes" id="nodes"></div>
+      <div class="inventory-toolbar"><p class="hint" id="captured-at"></p><button class="button button-secondary" id="refresh-button" type="button" data-i18n="refresh">Refresh inventory</button></div>
+      <section class="inventory-section" aria-labelledby="nodes-title"><h3 id="nodes-title" data-i18n="nodes">Nodes</h3><div class="table-wrap"><table><thead><tr>
+        <th data-i18n="name">Name</th><th data-i18n="status">Status</th><th data-i18n="pveVersion">Proxmox VE</th><th data-i18n="kernel">Kernel</th><th data-i18n="cpuModel">CPU model</th><th data-i18n="cores">Cores</th><th data-i18n="memoryTotal">Total memory</th><th data-i18n="diskTotalUsed">Disk total / used</th><th data-i18n="uptime">Uptime</th><th data-i18n="addresses">Configured addresses</th>
+      </tr></thead><tbody id="node-rows"></tbody></table><div class="empty" id="no-nodes" hidden data-i18n="noNodes">No nodes were returned.</div></div></section>
+      <section class="inventory-section" aria-labelledby="guests-title"><h3 id="guests-title" data-i18n="guests">VMs and containers</h3><div class="table-wrap"><table><thead><tr>
+        <th data-i18n="name">Name</th><th>VMID</th><th data-i18n="type">Type</th><th data-i18n="node">Node</th><th data-i18n="status">Status</th><th data-i18n="configuredOs">Configured OS</th><th data-i18n="vcpus">vCPU</th><th data-i18n="assignedMemory">Assigned memory</th><th data-i18n="assignedDisk">Assigned disk</th><th data-i18n="uptime">Uptime</th><th data-i18n="vlan">VLAN / interfaces</th>
+      </tr></thead><tbody id="guest-rows"></tbody></table><div class="empty" id="no-guests" hidden data-i18n="noGuests">No VMs or containers were returned.</div></div></section>
     </section>
   </main>
   <script>
@@ -129,8 +145,8 @@
         baseUrl: "Proxmox URL", username: "User name", realm: "Realm", tokenId: "API token ID", tokenIdHint: "Token ID only, without the user or realm.", tokenSecret: "API token secret",
         connect: "Connect", connecting: "Connecting…", disconnect: "Disconnect", connected: "Connected", disconnected: "Disconnected",
         credentialNote: "Use this page on a trusted network unless the application is behind HTTPS. The token stays in server memory and is cleared on disconnect or restart. The server connects to Proxmox over HTTPS and verifies its certificate.",
-        serverDetails: "Server details", nodes: "Nodes", version: "Version", release: "Release", noNodes: "No nodes were returned.", nodeUnknown: "Unknown",
-        noNodeName: "Unnamed node", nodeOnline: "Online", nodeOffline: "Offline", connectedMessage: "Proxmox connection verified.",
+        inventoryTitle: "Proxmox inventory", nodes: "Nodes", guests: "VMs and containers", name: "Name", status: "Status", type: "Type", node: "Node", pveVersion: "Proxmox VE", kernel: "Kernel", cpuModel: "CPU model", cores: "Cores", memoryTotal: "Total memory", diskTotalUsed: "Disk total / used", uptime: "Uptime", addresses: "Configured addresses", configuredOs: "Configured OS", vcpus: "vCPU", assignedMemory: "Assigned memory", assignedDisk: "Assigned disk", vlan: "VLAN / interfaces", refresh: "Refresh inventory", refreshing: "Refreshing…", capturedAt: "Captured {time}", noNodes: "No nodes were returned.", noGuests: "No VMs or containers were returned.", nodeUnknown: "Unknown", online: "Online", offline: "Offline", running: "Running", stopped: "Stopped", untagged: "Untagged", noVlan: "No VLAN configured", unknown: "Unknown",
+        connectedMessage: "Proxmox connection verified. Inventory loaded.", errConnectFirst: "Connect to Proxmox first.",
         errLocalOnly: "Local access only.", errPageNotFound: "Page not found.", errInvalidJson: "Invalid JSON request.",
         errRequired: "Enter the Proxmox URL and all API token fields.", errUrl: "Enter a valid HTTPS Proxmox URL.",
         errUrlDetails: "Enter a valid HTTPS Proxmox URL without credentials, query, or fragment.",
@@ -147,8 +163,8 @@
         baseUrl: "URL Proxmox", username: "Nom d’utilisateur", realm: "Realm", tokenId: "ID du jeton API", tokenIdHint: "Saisissez uniquement l’ID, sans l’utilisateur ni le realm.", tokenSecret: "Secret du jeton API",
         connect: "Connecter", connecting: "Connexion…", disconnect: "Déconnecter", connected: "Connecté", disconnected: "Déconnecté",
         credentialNote: "Utilisez cette page sur un réseau de confiance, sauf si l’application est accessible en HTTPS. Le jeton reste en mémoire sur le serveur et disparaît à la déconnexion ou au redémarrage. Le serveur contacte Proxmox en HTTPS et vérifie son certificat.",
-        serverDetails: "Détails du serveur", nodes: "Nœuds", version: "Version", release: "Édition", noNodes: "Aucun nœud n’a été renvoyé.", nodeUnknown: "Inconnu",
-        noNodeName: "Nœud sans nom", nodeOnline: "En ligne", nodeOffline: "Hors ligne", connectedMessage: "Connexion Proxmox vérifiée.",
+        inventoryTitle: "Inventaire Proxmox", nodes: "Nœuds", guests: "VM et conteneurs", name: "Nom", status: "État", type: "Type", node: "Nœud", pveVersion: "Proxmox VE", kernel: "Noyau", cpuModel: "Modèle du processeur", cores: "Cœurs", memoryTotal: "Mémoire totale", diskTotalUsed: "Disque total / utilisé", uptime: "Durée de fonctionnement", addresses: "Adresses configurées", configuredOs: "OS configuré", vcpus: "vCPU", assignedMemory: "Mémoire attribuée", assignedDisk: "Disque attribué", vlan: "VLAN / interfaces", refresh: "Actualiser l’inventaire", refreshing: "Actualisation…", capturedAt: "Collecté le {time}", noNodes: "Aucun nœud n’a été renvoyé.", noGuests: "Aucune VM ni aucun conteneur n’a été renvoyé.", nodeUnknown: "Inconnu", online: "En ligne", offline: "Hors ligne", running: "Démarrée", stopped: "Arrêtée", untagged: "Non marqué", noVlan: "Aucun VLAN configuré", unknown: "Inconnu",
+        connectedMessage: "Connexion Proxmox vérifiée. Inventaire chargé.", errConnectFirst: "Connectez-vous d’abord à Proxmox.",
         errLocalOnly: "Accès local uniquement.", errPageNotFound: "Page introuvable.", errInvalidJson: "Requête JSON invalide.",
         errRequired: "Saisissez l’URL Proxmox et tous les champs du jeton API.", errUrl: "Saisissez une URL Proxmox HTTPS valide.",
         errUrlDetails: "Saisissez une URL HTTPS valide sans identifiants, paramètres ni fragment.",
@@ -166,7 +182,8 @@
       "Saisissez un ID de jeton Proxmox valide.": "errTokenId", "Saisissez un secret de jeton API valide.": "errTokenSecret",
       "Proxmox a refusé le jeton API. Vérifiez son ID, son secret et ses permissions.": "errAuth",
       "Impossible de joindre l’API Proxmox de façon sécurisée. Vérifiez l’URL, le certificat et la connexion.": "errReach",
-      "Proxmox a renvoyé un JSON invalide.": "errJson", "Réponse inattendue de l’API Proxmox.": "errResponse"
+      "Proxmox a renvoyé un JSON invalide.": "errJson", "Réponse inattendue de l’API Proxmox.": "errResponse",
+      "Connectez-vous d’abord à Proxmox.": "errConnectFirst"
     };
     Object.assign(errorMap, {
       "Local access only.": "errLocalOnly", "Page not found.": "errPageNotFound", "Invalid JSON request.": "errInvalidJson",
@@ -186,6 +203,7 @@
     let language = detectLanguage();
     const t = (key, values = {}) => Object.entries(values).reduce((text, [name, value]) => text.replaceAll(`{${name}}`, String(value)), translations[language][key] || key);
     let connection = null;
+    let inventory = null;
     function applyTranslations() {
       document.documentElement.lang = language;
       document.title = t("pageTitle");
@@ -195,6 +213,7 @@
       $("language-toggle").setAttribute("aria-label", language === "fr" ? "Passer la langue en anglais" : "Switch language to French");
       if (!connection) $("status-label").textContent = t("disconnected");
       if (connection) renderConnection(connection);
+      if (inventory) renderInventory(inventory);
       if ($("message").dataset.rawError) $("message").textContent = translatedError(new Error($("message").dataset.rawError));
       else if ($("message").dataset.successKey) $("message").textContent = t($("message").dataset.successKey);
     }
@@ -242,27 +261,105 @@
       if (version.version) parts.push(`<strong>${t("version")}:</strong> ${escapeHtml(version.version)}`);
       if (version.release) parts.push(`<strong>${t("release")}:</strong> ${escapeHtml(version.release)}`);
       $("version").innerHTML = parts.join(' <span aria-hidden="true">·</span> ');
-      const nodes = $("nodes");
-      nodes.replaceChildren();
-      if (!connection.nodes || connection.nodes.length === 0) {
-        const empty = document.createElement("div");
-        empty.className = "empty";
-        empty.textContent = t("noNodes");
-        nodes.append(empty);
-      } else {
-        for (const node of connection.nodes) {
-          const item = document.createElement("div");
-          item.className = "node";
-          const name = document.createElement("span");
-          name.className = "node-name";
-          name.textContent = node.node || t("noNodeName");
-          const state = document.createElement("span");
-          state.className = "node-status" + (node.status === "online" ? " online" : "");
-          const statusLabels = { online: t("nodeOnline"), offline: t("nodeOffline"), unknown: t("nodeUnknown") };
-          state.textContent = statusLabels[node.status] || node.status || t("nodeUnknown");
-          item.append(name, state);
-          nodes.append(item);
-        }
+    }
+    function formatBytes(value) {
+      if (value === null || value === undefined || !Number.isFinite(Number(value))) return "—";
+      const bytes = Number(value);
+      if (bytes < 1024) return `${bytes} B`;
+      const units = ["KiB", "MiB", "GiB", "TiB"];
+      let size = bytes;
+      let unit = "B";
+      for (const next of units) { size /= 1024; unit = next; if (size < 1024) break; }
+      return `${size.toFixed(size >= 100 ? 0 : 1)} ${unit}`;
+    }
+    function formatUptime(value) {
+      if (value === null || value === undefined || !Number.isFinite(Number(value))) return "—";
+      let seconds = Math.max(0, Math.floor(Number(value)));
+      const days = Math.floor(seconds / 86400); seconds %= 86400;
+      const hours = Math.floor(seconds / 3600); seconds %= 3600;
+      const minutes = Math.floor(seconds / 60);
+      if (language === "fr") return [days && `${days} j`, hours && `${hours} h`, minutes && `${minutes} min`].filter(Boolean).join(" ") || "< 1 min";
+      return [days && `${days} d`, hours && `${hours} h`, minutes && `${minutes} min`].filter(Boolean).join(" ") || "< 1 min";
+    }
+    function statusLabel(status) {
+      const labels = { online: "online", offline: "offline", running: "running", stopped: "stopped", unknown: "unknown" };
+      return labels[status] ? t(labels[status]) : status || t("unknown");
+    }
+    function addCell(row, value, className = "") {
+      const cell = document.createElement("td");
+      if (className) cell.className = className;
+      cell.textContent = value === null || value === undefined || value === "" ? "—" : String(value);
+      row.append(cell);
+    }
+    function renderInventory(data) {
+      inventory = data || null;
+      if (!inventory) return;
+      const captured = inventory.capturedAt ? new Date(inventory.capturedAt).toLocaleString(language === "fr" ? "fr-FR" : "en-US") : "—";
+      $("captured-at").textContent = t("capturedAt", { time: captured });
+      const nodeRows = $("node-rows");
+      nodeRows.replaceChildren();
+      const nodes = inventory.nodes || [];
+      $("no-nodes").hidden = nodes.length > 0;
+      for (const node of nodes) {
+        const row = document.createElement("tr");
+        addCell(row, node.name);
+        addCell(row, statusLabel(node.status));
+        addCell(row, node.pveVersion);
+        addCell(row, node.kernelVersion);
+        addCell(row, node.cpuModel, "wrap");
+        addCell(row, node.cpuCores);
+        addCell(row, formatBytes(node.memoryTotal));
+        addCell(row, `${formatBytes(node.diskTotal)} / ${formatBytes(node.diskUsed)}`);
+        addCell(row, formatUptime(node.uptime));
+        const addresses = (node.addresses || []).map((item) => `${item.interface ? `${item.interface}: ` : ""}${item.address}`).join("\n") || "—";
+        addCell(row, addresses, "wrap");
+        row.lastElementChild.style.whiteSpace = "pre-line";
+        nodeRows.append(row);
+      }
+      const guestRows = $("guest-rows");
+      guestRows.replaceChildren();
+      const guests = inventory.guests || [];
+      $("no-guests").hidden = guests.length > 0;
+      for (const guest of guests) {
+        const row = document.createElement("tr");
+        addCell(row, guest.name);
+        addCell(row, guest.vmid);
+        addCell(row, guest.type === "qemu" ? "QEMU" : guest.type === "lxc" ? "LXC" : guest.type);
+        addCell(row, guest.node);
+        addCell(row, statusLabel(guest.status));
+        addCell(row, guest.os);
+        addCell(row, guest.vcpus);
+        addCell(row, formatBytes(guest.memory));
+        addCell(row, formatBytes(guest.disk));
+        addCell(row, guest.status === "running" ? formatUptime(guest.uptime) : "—");
+        const vlan = (guest.interfaces || []).map((item) => {
+          const parts = [];
+          if (item.tag !== null && item.tag !== undefined) parts.push(`VLAN ${item.tag}`);
+          if (item.trunks && item.trunks.length) parts.push(`trunks ${item.trunks.join(", ")}`);
+          return `${item.interface}: ${parts.join(" · ") || t("untagged")}`;
+        }).join("\n") || t("noVlan");
+        addCell(row, vlan, "wrap");
+        row.lastElementChild.style.whiteSpace = "pre-line";
+        guestRows.append(row);
+      }
+    }
+    async function refreshInventory() {
+      const button = $("refresh-button");
+      button.disabled = true;
+      button.textContent = t("refreshing");
+      try {
+        const data = await api("/api/proxmox/inventory");
+        renderInventory(data);
+        delete $("message").dataset.rawError;
+        delete $("message").dataset.successKey;
+        $("message").hidden = true;
+        return true;
+      } catch (error) {
+        showError(error);
+        return false;
+      } finally {
+        button.disabled = false;
+        button.textContent = t("refresh");
       }
     }
     function escapeHtml(value) {
@@ -284,8 +381,10 @@
         });
         $("token-secret").value = "";
         renderConnection(data);
-        showMessage(t("connectedMessage"), true);
-        $("message").dataset.successKey = "connectedMessage";
+        if (await refreshInventory()) {
+          showMessage(t("connectedMessage"), true);
+          $("message").dataset.successKey = "connectedMessage";
+        }
       } catch (error) {
         showError(error);
       } finally {
@@ -297,17 +396,24 @@
       try {
         await api("/api/proxmox/disconnect", {});
         renderConnection(null);
+        inventory = null;
+        $("node-rows").replaceChildren();
+        $("guest-rows").replaceChildren();
         $("token-secret").value = "";
         $("message").hidden = true;
       } catch (error) { showError(error); }
     });
+    $("refresh-button").addEventListener("click", refreshInventory);
     $("language-toggle").addEventListener("click", () => {
       language = language === "fr" ? "en" : "fr";
       try { localStorage.setItem("meraki-inventory-language", language); } catch (_) {}
       applyTranslations();
     });
     applyTranslations();
-    api("/api/proxmox/status").then(renderConnection).catch(showError);
+    api("/api/proxmox/status").then(async (data) => {
+      renderConnection(data);
+      if (data.connected) await refreshInventory();
+    }).catch(showError);
   </script>
 </body>
 </html>

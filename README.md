@@ -63,7 +63,11 @@ La base SQLite est stockée dans `./data/inventory.sqlite3` sur l’hôte et mon
 
 Ouvrez `/proxmox` depuis la navigation, puis renseignez l’URL HTTPS du serveur, le nom d’utilisateur, le realm, l’ID du jeton et son secret. Par exemple, pour `inventory@pve!readonly`, entrez `inventory`, `pve` et `readonly` dans les trois champs correspondants. Le secret doit être celui créé dans Proxmox pour ce jeton.
 
-La page valide le jeton avec les points d’accès de lecture de la version et des nœuds, puis affiche leur résultat. Le jeton reste en mémoire sur le serveur et disparaît à la déconnexion ou au redémarrage. Le certificat HTTPS de Proxmox doit être approuvé par la machine qui exécute l’application. Aucun secret Proxmox n’est écrit dans la base SQLite. Utilisez cette page sur un réseau de confiance ou derrière un proxy HTTPS : la connexion navigateur vers l’application peut être en HTTP.
+Après connexion, la page `/proxmox` collecte et affiche l’inventaire courant du cluster. Le tableau des nœuds comprend l’état, la version de Proxmox VE, le noyau, le processeur, les cœurs, la mémoire, l’espace disque racine, la durée de fonctionnement et les adresses configurées. Le tableau des VM et conteneurs comprend le nom, le VMID, le type, le nœud, l’état, l’OS configuré, les vCPU, la mémoire et le disque attribués, la durée de fonctionnement et les VLAN par interface. Les VLAN tagués et les trunks sont distingués ; une interface sans tag ni trunk est indiquée comme non marquée.
+
+Ces informations Proxmox sont relues à chaque connexion ou actualisation et ne sont pas enregistrées dans la base SQLite. Un OS invité détecté et les adresses IP de l’invité ne sont pas collectés : ils nécessitent des agents invités actifs et sont distincts de l’OS configuré et des adresses réseau des nœuds.
+
+Le jeton doit avoir les permissions d’audit en lecture nécessaires (`Sys.Audit` pour l’état et le réseau des nœuds, `VM.Audit` pour la configuration des VM et conteneurs). Il reste en mémoire sur le serveur et disparaît à la déconnexion ou au redémarrage. Le certificat HTTPS de Proxmox doit être approuvé par la machine qui exécute l’application. Aucun secret Proxmox n’est écrit dans la base SQLite. Utilisez cette page sur un réseau de confiance ou derrière un proxy HTTPS : la connexion navigateur vers l’application peut être en HTTP.
 
 Lors du passage depuis l’ancienne configuration qui utilisait un volume Docker nommé, copiez d’abord la base existante avant de récupérer cette version, afin de conserver l’inventaire :
 

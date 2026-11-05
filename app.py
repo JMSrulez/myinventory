@@ -6,6 +6,7 @@ import os
 import re
 import sqlite3
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -235,6 +236,135 @@ def validate_proxmox_credentials(data: dict[str, Any]) -> tuple[str, str, str]:
     return normalized_url, username + "@" + realm, token_header
 
 
+def proxmox_number(value: Any) -> int | None:
+    try:
+        return int(float(value))
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def proxmox_inventory() -> dict[str, Any]:
+    if not PROXMOX_SESSION:
+        raise ProxmoxError("Connectez-vous d’abord à Proxmox.")
+    base_url = PROXMOX_SESSION["baseUrl"]
+    token_header = PROXMOX_SESSION["tokenHeader"]
+    resources = proxmox_get(base_url, token_header, "cluster/resources")
+    if not isinstance(resources, list):
+        raise ProxmoxError("Unexpected Proxmox API response.")
+
+    node_resources = [item for item in resources if isinstance(item, dict) and item.get("type") == "node"]
+    guests = [item for item in resources if isinstance(item, dict) and item.get("type") in ("qemu", "lxc")]
+
+    def collect_node(resource: dict[str, Any]) -> dict[str, Any]:
+        name = str(resource.get("node") or resource.get("id") or "")
+        if not name:
+            return {}
+        status_name = str(resource.get("status") or "unknown")
+        if status_name != "online":
+            return {
+                "name": name, "status": status_name, "pveVersion": None,
+                "kernelVersion": None, "cpuModel": None, "cpuCores": None,
+                "memoryTotal": proxmox_number(resource.get("maxmem")),
+                "diskTotal": proxmox_number(resource.get("maxdisk")),
+                "diskUsed": None, "uptime": None, "addresses": [],
+            }
+        encoded_node = quote(name, safe="")
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            status_future = executor.submit(
+                proxmox_get, base_url, token_header, "nodes/" + encoded_node + "/status"
+            )
+            network_future = executor.submit(
+                proxmox_get, base_url, token_header, "nodes/" + encoded_node + "/network"
+            )
+            status = status_future.result()
+            network = network_future.result()
+        if not isinstance(status, dict) or not isinstance(network, list):
+            raise ProxmoxError("Unexpected Proxmox API response.")
+        cpu = status.get("cpuinfo") if isinstance(status.get("cpuinfo"), dict) else {}
+        memory = status.get("memory") if isinstance(status.get("memory"), dict) else {}
+        rootfs = status.get("rootfs") if isinstance(status.get("rootfs"), dict) else {}
+        sockets = proxmox_number(cpu.get("sockets"))
+        cores_per_socket = proxmox_number(cpu.get("cores"))
+        cores = sockets * cores_per_socket if sockets and cores_per_socket else proxmox_number(cpu.get("cpus"))
+        version_text = str(status.get("pveversion") or "")
+        version_match = re.search(r"pve-manager/([^/]+)", version_text)
+        kernel = status.get("kversion")
+        kernel_version = kernel.get("release") if isinstance(kernel, dict) else kernel
+        addresses = []
+        for interface in network:
+            if not isinstance(interface, dict):
+                continue
+            address = str(interface.get("cidr") or interface.get("address") or "")
+            if address and "/" not in address and interface.get("netmask"):
+                address += "/" + str(interface["netmask"])
+            if address:
+                addresses.append({"interface": str(interface.get("iface") or ""), "address": address})
+        return {
+            "name": name,
+            "status": status_name,
+            "pveVersion": version_match.group(1) if version_match else version_text or None,
+            "kernelVersion": kernel_version,
+            "cpuModel": cpu.get("model"),
+            "cpuCores": cores,
+            "memoryTotal": proxmox_number(memory.get("total")) or proxmox_number(resource.get("maxmem")),
+            "diskTotal": proxmox_number(rootfs.get("total")) or proxmox_number(resource.get("maxdisk")),
+            "diskUsed": proxmox_number(rootfs.get("used")),
+            "uptime": proxmox_number(status.get("uptime")),
+            "addresses": addresses,
+        }
+
+    def collect_guest(resource: dict[str, Any]) -> dict[str, Any]:
+        node = str(resource.get("node") or "")
+        vmid = proxmox_number(resource.get("vmid"))
+        kind = str(resource.get("type") or "")
+        if not node or vmid is None or kind not in ("qemu", "lxc"):
+            return {}
+        endpoint = "nodes/" + quote(node, safe="") + "/" + kind + "/" + str(vmid) + "/config"
+        config = proxmox_get(base_url, token_header, endpoint)
+        if not isinstance(config, dict):
+            raise ProxmoxError("Unexpected Proxmox API response.")
+        cores = proxmox_number(config.get("cores"))
+        sockets = proxmox_number(config.get("sockets")) or 1
+        vcpus = cores * sockets if cores is not None else (
+            proxmox_number(config.get("vcpus")) or proxmox_number(resource.get("maxcpu"))
+        )
+        memory_mib = proxmox_number(config.get("memory"))
+        interfaces = []
+        for key, value in config.items():
+            if not re.fullmatch(r"net\d+", str(key)) or not isinstance(value, str):
+                continue
+            options = {}
+            for entry in value.split(","):
+                if "=" in entry:
+                    option, option_value = entry.split("=", 1)
+                    options[option] = option_value
+            tag = options.get("tag")
+            trunks = [item for item in options.get("trunks", "").split(";") if item]
+            interfaces.append({"interface": key, "tag": tag, "trunks": trunks})
+        return {
+            "name": str(config.get("name") or resource.get("name") or ""),
+            "vmid": vmid,
+            "type": kind,
+            "node": node,
+            "status": str(resource.get("status") or "unknown"),
+            "os": config.get("ostype"),
+            "vcpus": vcpus,
+            "memory": memory_mib * 1024 * 1024 if memory_mib is not None else proxmox_number(resource.get("maxmem")),
+            "disk": proxmox_number(resource.get("maxdisk")),
+            "uptime": proxmox_number(resource.get("uptime")),
+            "interfaces": interfaces,
+        }
+
+    with ThreadPoolExecutor(max_workers=min(12, max(len(node_resources), len(guests), 1))) as executor:
+        node_results = list(executor.map(collect_node, node_resources))
+        guest_results = list(executor.map(collect_guest, guests))
+    return {
+        "capturedAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "nodes": [node for node in node_results if node],
+        "guests": [guest for guest in guest_results if guest],
+    }
+
+
 def meraki_get(path: str) -> list[dict[str, Any]]:
     """Fetch every page from a Meraki endpoint, following Link headers."""
     if not API_KEY:
@@ -409,6 +539,12 @@ class Handler(BaseHTTPRequestHandler):
                 "version": PROXMOX_INFO.get("version", {}) if PROXMOX_INFO else {},
                 "nodes": PROXMOX_INFO.get("nodes", []) if PROXMOX_INFO else [],
             })
+            return
+        if self.path == "/api/proxmox/inventory":
+            try:
+                self.send_json(200, proxmox_inventory())
+            except ProxmoxError as exc:
+                self.send_json(502 if PROXMOX_SESSION else 401, {"error": str(exc)})
             return
         if self.path == "/api/status":
             self.send_json(200, {
