@@ -233,7 +233,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def main() -> None:
     host = os.environ.get("MERAKI_INVENTORY_HOST", "127.0.0.1")
-    port = int(os.environ.get("MERAKI_INVENTORY_PORT", "8000"))
+    port = int(os.environ.get("MERAKI_INVENTORY_PORT", "8086"))
     server = ThreadingHTTPServer((host, port), Handler)
     print("Inventaire Meraki disponible sur http://" + host + ":" + str(port))
     try:

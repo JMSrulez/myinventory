@@ -4,17 +4,17 @@ Collecteur local pour parcourir les organisations et réseaux du Dashboard Merak
 
 ## Déploiement Docker sur Ubuntu
 
-Le conteneur écoute sur le réseau Docker. Par défaut, le port est publié uniquement sur `127.0.0.1` de l’hôte, et l’interface est accessible depuis Ubuntu sur `http://127.0.0.1:8000`.
+Le conteneur écoute sur le réseau Docker. Par défaut, le port `8086` est publié uniquement sur `127.0.0.1` de l’hôte, et l’interface est accessible depuis Ubuntu sur `http://127.0.0.1:8086`.
 
 ### Configuration avec .env
 
 Cette méthode convient à une installation Docker Compose sur un hôte maîtrisé. Docker transmet la variable au conteneur, où elle est disponible dans son environnement. Les administrateurs Docker peuvent donc la voir avec les outils d’inspection.
 
 1. Copiez `.env.example` vers `.env`.
-2. Renseignez `MERAKI_API_KEY` et vérifiez le port souhaité.
+2. Renseignez `MERAKI_API_KEY` et, si nécessaire, ajustez `PUBLISHED_PORT` (port de l’hôte) et `MERAKI_INVENTORY_PORT` (port d’écoute dans le conteneur).
 3. Restreignez l’accès au fichier : `chmod 600 .env`.
 4. Démarrez l’application avec `docker compose up -d --build`.
-5. Ouvrez `http://127.0.0.1:8000`.
+5. Ouvrez `http://127.0.0.1:8086`.
 
 Le fichier `.env` est exclu de Git. La clé n’est pas incluse dans l’image Docker. Elle est lue au démarrage et n’est jamais renvoyée à la page web.
 
@@ -40,7 +40,7 @@ La publication sur `127.0.0.1` protège l’accès par défaut. Pour utiliser un
 
 ## Démarrage sans Docker
 
-Python 3.10 ou plus récent est requis. Aucun paquet tiers n’est nécessaire. Lancez `python app.py` puis ouvrez `http://127.0.0.1:8000`. Sans clé configurée dans l’environnement, l’interface permet de la saisir ; elle reste en mémoire jusqu’à l’arrêt du serveur ou la déconnexion.
+Python 3.10 ou plus récent est requis. Aucun paquet tiers n’est nécessaire. Lancez `python app.py` puis ouvrez `http://127.0.0.1:8086`. Sans clé configurée dans l’environnement, l’interface permet de la saisir ; elle reste en mémoire jusqu’à l’arrêt du serveur ou la déconnexion.
 
 ## Phase 1
 
