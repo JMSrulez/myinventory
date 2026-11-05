@@ -1,22 +1,28 @@
-"""Local Meraki inventory collector, phase 1."""
+"""Local Meraki inventory collector."""
 from __future__ import annotations
 
 import json
 import os
 import re
+import sqlite3
 import time
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import quote, urljoin, urlsplit
 from urllib.request import Request, urlopen
 
 API_ROOT = "https://api.meraki.com/api/v1/"
 APP_DIR = Path(__file__).resolve().parent
+INVENTORY_DB_PATH = Path(os.environ.get(
+    "MERAKI_INVENTORY_DATABASE", str(APP_DIR / "data" / "inventory.sqlite3")
+))
 API_KEY: str | None = None
 CONFIGURED_API_KEY: str | None = None
 ORGANIZATIONS: list[dict[str, Any]] = []
+NETWORKS: dict[str, dict[str, Any]] = {}
 
 
 def load_configured_api_key() -> str | None:
@@ -32,6 +38,93 @@ def load_configured_api_key() -> str | None:
 
 
 CONFIGURED_API_KEY = load_configured_api_key()
+
+
+def initialize_inventory_database() -> None:
+    INVENTORY_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(INVENTORY_DB_PATH) as connection:
+        connection.executescript("""
+            CREATE TABLE IF NOT EXISTS inventory_networks (
+                network_id TEXT PRIMARY KEY,
+                network_name TEXT NOT NULL,
+                organization_id TEXT NOT NULL,
+                organization_name TEXT NOT NULL,
+                captured_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS inventory_devices (
+                network_id TEXT NOT NULL REFERENCES inventory_networks(network_id) ON DELETE CASCADE,
+                device_key TEXT NOT NULL,
+                name TEXT NOT NULL,
+                model TEXT NOT NULL,
+                serial TEXT NOT NULL,
+                management_ip TEXT NOT NULL,
+                PRIMARY KEY (network_id, device_key)
+            );
+        """)
+
+
+def read_inventory() -> list[dict[str, Any]]:
+    with sqlite3.connect(INVENTORY_DB_PATH) as connection:
+        connection.row_factory = sqlite3.Row
+        networks = connection.execute(
+            "SELECT * FROM inventory_networks ORDER BY network_name COLLATE NOCASE"
+        ).fetchall()
+        result = []
+        for network in networks:
+            devices = connection.execute(
+                "SELECT name, model, serial, management_ip FROM inventory_devices "
+                "WHERE network_id = ? ORDER BY name COLLATE NOCASE, serial",
+                (network["network_id"],),
+            ).fetchall()
+            result.append({
+                "id": network["network_id"],
+                "name": network["network_name"],
+                "organizationId": network["organization_id"],
+                "organizationName": network["organization_name"],
+                "capturedAt": network["captured_at"],
+                "devices": [dict(device) for device in devices],
+            })
+    return result
+
+
+def store_inventory(networks: list[dict[str, Any]]) -> int:
+    captured_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    device_count = 0
+    with sqlite3.connect(INVENTORY_DB_PATH) as connection:
+        for network in networks:
+            connection.execute(
+                "INSERT INTO inventory_networks "
+                "(network_id, network_name, organization_id, organization_name, captured_at) "
+                "VALUES (?, ?, ?, ?, ?) "
+                "ON CONFLICT(network_id) DO UPDATE SET "
+                "network_name = excluded.network_name, "
+                "organization_id = excluded.organization_id, "
+                "organization_name = excluded.organization_name, "
+                "captured_at = excluded.captured_at",
+                (
+                    network["id"], network["name"], network["organizationId"],
+                    network["organizationName"], captured_at,
+                ),
+            )
+            connection.execute(
+                "DELETE FROM inventory_devices WHERE network_id = ?",
+                (network["id"],),
+            )
+            for index, device in enumerate(network["devices"]):
+                serial = str(device.get("serial") or "")
+                device_key = serial or str(device.get("mac") or "") or "device-" + str(index)
+                connection.execute(
+                    "INSERT INTO inventory_devices "
+                    "(network_id, device_key, name, model, serial, management_ip) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (
+                        network["id"], device_key, str(device.get("name") or ""),
+                        str(device.get("model") or ""), serial,
+                        str(device.get("lanIp") or device.get("managementIp") or ""),
+                    ),
+                )
+                device_count += 1
+    return device_count
 
 
 class MerakiError(Exception):
@@ -152,12 +245,27 @@ class Handler(BaseHTTPRequestHandler):
         if not self.is_local_request():
             self.send_json(403, {"error": "Accès local uniquement."})
             return
+        if self.path == "/inventory":
+            page = (APP_DIR / "inventory.html").read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(page)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(page)
+            return
         if self.path == "/api/status":
             self.send_json(200, {
                 "connected": API_KEY is not None,
                 "configured": CONFIGURED_API_KEY is not None,
                 "organizations": ORGANIZATIONS,
             })
+            return
+        if self.path == "/api/inventory":
+            try:
+                self.send_json(200, {"networks": read_inventory()})
+            except sqlite3.Error as exc:
+                self.send_json(500, {"error": "Impossible de lire l’inventaire enregistré."})
             return
         if self.path in ("/", "/index.html"):
             page = (APP_DIR / "index.html").read_bytes()
@@ -171,7 +279,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(404, {"error": "Page introuvable."})
 
     def do_POST(self) -> None:
-        global API_KEY, ORGANIZATIONS
+        global API_KEY, ORGANIZATIONS, NETWORKS
         if not self.is_local_request():
             self.send_json(403, {"error": "Accès local uniquement."})
             return
@@ -191,9 +299,11 @@ class Handler(BaseHTTPRequestHandler):
                 return
             try:
                 ORGANIZATIONS = meraki_get("organizations")
+                NETWORKS = {}
             except MerakiError as exc:
                 API_KEY = None
                 ORGANIZATIONS = []
+                NETWORKS = {}
                 self.send_json(502, {"error": str(exc)})
                 return
             self.send_json(200, {
@@ -221,17 +331,70 @@ class Handler(BaseHTTPRequestHandler):
             except MerakiError as exc:
                 self.send_json(502, {"error": str(exc)})
                 return
+            NETWORKS = {
+                str(network.get("id", "")): network
+                for network in networks
+                if network.get("id")
+            }
             self.send_json(200, {"networks": networks})
+            return
+        if self.path == "/api/capture":
+            if API_KEY is None:
+                self.send_json(401, {"error": "Connectez-vous d’abord à Meraki."})
+                return
+            network_ids = data.get("networkIds")
+            if not isinstance(network_ids, list) or not network_ids or not all(
+                isinstance(item, str) for item in network_ids
+            ):
+                self.send_json(400, {"error": "Sélection de réseaux invalide."})
+                return
+            selected_ids = list(dict.fromkeys(network_ids))
+            if any(network_id not in NETWORKS for network_id in selected_ids):
+                self.send_json(400, {"error": "Un réseau sélectionné n’est pas disponible. Rechargez les réseaux."})
+                return
+            captured_networks: list[dict[str, Any]] = []
+            try:
+                for network_id in selected_ids:
+                    source = NETWORKS[network_id]
+                    devices = meraki_get(
+                        "networks/" + quote(network_id, safe="") + "/devices"
+                    )
+                    organization_id = str(source.get("organizationId", ""))
+                    organization = next(
+                        (item for item in ORGANIZATIONS if str(item.get("id", "")) == organization_id),
+                        {},
+                    )
+                    captured_networks.append({
+                        "id": network_id,
+                        "name": str(source.get("name") or "Réseau sans nom"),
+                        "organizationId": organization_id,
+                        "organizationName": str(organization.get("name") or "Organisation"),
+                        "devices": devices,
+                    })
+            except MerakiError as exc:
+                self.send_json(502, {"error": str(exc)})
+                return
+            try:
+                device_count = store_inventory(captured_networks)
+            except sqlite3.Error as exc:
+                self.send_json(500, {"error": "Impossible d’enregistrer l’inventaire."})
+                return
+            self.send_json(200, {
+                "networkCount": len(captured_networks),
+                "deviceCount": device_count,
+            })
             return
         if self.path == "/api/disconnect":
             API_KEY = None
             ORGANIZATIONS = []
+            NETWORKS = {}
             self.send_json(200, {"connected": False})
             return
         self.send_json(404, {"error": "Route introuvable."})
 
 
 def main() -> None:
+    initialize_inventory_database()
     host = os.environ.get("MERAKI_INVENTORY_HOST", "127.0.0.1")
     port = int(os.environ.get("MERAKI_INVENTORY_PORT", "8086"))
     server = ThreadingHTTPServer((host, port), Handler)

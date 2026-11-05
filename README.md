@@ -48,4 +48,10 @@ Python 3.10 ou plus récent est requis. Aucun paquet tiers n’est nécessaire. 
 - affichage et sélection de plusieurs organisations;
 - chargement et sélection des réseaux correspondants.
 
-La collecte des équipements et le stockage local des données d’inventaire sont prévus dans les phases suivantes.
+## Phase 2
+
+- capture des équipements des réseaux sélectionnés depuis l’API Meraki;
+- stockage du nom, modèle, numéro de série et IP de gestion (`lanIp`) de chaque équipement;
+- consultation de l’inventaire dans un onglet par réseau depuis la page Inventaire.
+
+Les données sont conservées dans la base SQLite du volume Docker `inventory-data`, y compris après la recréation du conteneur. Elles ne sont supprimées qu’en supprimant explicitement ce volume.

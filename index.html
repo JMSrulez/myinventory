@@ -18,12 +18,15 @@
     button, input { font: inherit; }
     .shell { max-width: 1160px; margin: auto; padding: 38px 28px 64px; }
     header { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 30px; }
+    .site-nav { display: flex; gap: 7px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: white; }
+    .nav-link { padding: 7px 11px; border-radius: 7px; color: var(--muted); font-size: 12px; font-weight: 650; text-decoration: none; }
+    .nav-link:hover { color: var(--green-dark); background: #f6f8f6; }
+    .nav-link[aria-current="page"] { background: #eaf4ed; color: var(--green-dark); }
     .brand { display: flex; align-items: center; gap: 14px; }
     .brand-mark { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 13px; background: #dceee2; color: var(--green-dark); }
     .brand-mark svg { width: 24px; height: 24px; }
     .eyebrow { margin: 0 0 5px; color: var(--green); font-size: 11px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
     h1 { margin: 0; font-size: clamp(24px, 3vw, 32px); letter-spacing: -.04em; font-weight: 680; }
-    .phase { padding: 7px 11px; border: 1px solid #d6e8db; border-radius: 999px; background: #eff7f0; color: #276344; font-size: 12px; font-weight: 650; white-space: nowrap; }
     .intro { max-width: 700px; margin: 0 0 25px; color: var(--muted); line-height: 1.65; font-size: 15px; }
     .card { border: 1px solid var(--line); border-radius: 14px; background: var(--paper); box-shadow: 0 3px 14px #193c2910; }
     .connection { padding: 22px 24px; margin-bottom: 20px; }
@@ -76,6 +79,7 @@
     .network-tools .button { min-height: 32px; padding: 0 10px; font-size: 11px; }
     .message { display: none; margin: 0 0 18px; padding: 12px 15px; border: 1px solid #f0cfcb; border-radius: 9px; background: #fff7f6; color: #a63e39; font-size: 13px; line-height: 1.5; }
     .message.visible { display: block; }
+    .message.success { border-color: #c9e5d3; background: #f0f8f2; color: #276344; }
     .footer-note { margin: 20px 2px 0; color: #7d8a83; font-size: 12px; line-height: 1.6; }
     .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
     @media (max-width: 740px) {
@@ -98,9 +102,12 @@
         </div>
         <div><p class="eyebrow">Outils réseau</p><h1>Inventaire Meraki</h1></div>
       </div>
-      <span class="phase">Phase 1 · Connexion</span>
+      <nav class="site-nav" aria-label="Navigation principale">
+        <a class="nav-link" href="/" aria-current="page">Setup</a>
+        <a class="nav-link" href="/inventory">Inventaire</a>
+      </nav>
     </header>
-    <p class="intro">Connectez-vous au Dashboard Meraki pour parcourir vos organisations et choisir les réseaux à synchroniser. La collecte de l’inventaire des équipements viendra à l’étape suivante.</p>
+    <p class="intro">Connectez-vous au Dashboard Meraki, choisissez les organisations et les réseaux à inventorier, puis capturez les équipements sélectionnés.</p>
 
     <section class="card connection" aria-labelledby="connection-title">
       <div class="section-heading">
@@ -133,12 +140,12 @@
         <div class="list-head"><div class="list-title-line"><h2 id="network-title">Réseaux</h2><span class="count" id="network-count">0</span></div><p class="hint">Les réseaux des organisations choisies apparaîtront ici.</p></div>
         <div class="list-actions">
           <span class="hint" id="network-selected">Aucun réseau chargé</span>
-          <div class="network-tools"><button class="text-button" id="select-all-networks" type="button" hidden>Tout sélectionner</button><button class="button button-secondary" id="load-networks" type="button" disabled>Charger les réseaux</button></div>
+          <div class="network-tools"><button class="text-button" id="select-all-networks" type="button" hidden>Tout sélectionner</button><button class="button button-secondary" id="load-networks" type="button" disabled>Charger les réseaux</button><button class="button button-primary" id="capture-inventory" type="button" disabled>Capturer la sélection</button></div>
         </div>
         <div class="list-scroll" id="network-list"><div class="empty"><div class="empty-inner"><strong>Aucun réseau affiché</strong><span>Sélectionnez une organisation, puis chargez ses réseaux.</span></div></div></div>
       </section>
     </section>
-    <p class="footer-note">Les organisations et réseaux sont lus depuis l’API Dashboard Meraki. Aucune donnée d’inventaire matériel n’est collectée à cette étape.</p>
+    <p class="footer-note">La capture met à jour l’inventaire enregistré pour chaque réseau sélectionné. Les autres réseaux déjà capturés restent conservés.</p>
   </main>
   <script>
     const state = { organizations: [], networks: [], networkOrganizationIds: [], networksLoaded: false, keyConfigured: false };
@@ -148,6 +155,12 @@
       const box = $("message");
       box.textContent = message || "";
       box.classList.toggle("visible", Boolean(message));
+      box.classList.remove("success");
+    }
+
+    function showSuccess(message) {
+      showMessage(message);
+      $("message").classList.add("success");
     }
 
     async function api(path, options = {}) {
@@ -246,6 +259,7 @@
         const detail = state.networksLoaded ? "Aucun réseau ne correspond aux organisations sélectionnées." : "Sélectionnez des organisations, puis chargez leurs réseaux.";
         list.innerHTML = '<div class="empty"><div class="empty-inner"><strong>' + title + '</strong><span>' + detail + '</span></div></div>';
         $("network-selected").textContent = state.networksLoaded ? "0 réseau chargé" : "Aucun réseau chargé";
+        updateNetworkSelection();
         return;
       }
       const orgNames = new Map(state.organizations.map((org) => [String(org.id), org.name || org.id]));
@@ -291,6 +305,7 @@
       const selected = document.querySelectorAll(".network-check:checked").length;
       $("network-selected").textContent = selected + " réseau" + (selected > 1 ? "x" : "") + " sélectionné" + (selected > 1 ? "s" : "");
       $("select-all-networks").textContent = selected === state.networks.length ? "Tout désélectionner" : "Tout sélectionner";
+      $("capture-inventory").disabled = selected === 0;
     }
 
     $("connect-form").addEventListener("submit", async (event) => {
@@ -364,6 +379,25 @@
       boxes.forEach((box) => { box.checked = select; });
       $("select-all-networks").textContent = select ? "Tout désélectionner" : "Tout sélectionner";
       updateNetworkSelection();
+    });
+
+    $("capture-inventory").addEventListener("click", async () => {
+      showMessage("");
+      const button = $("capture-inventory");
+      const networkIds = [...document.querySelectorAll(".network-check:checked")].map((box) => box.value);
+      setBusy(button, true, "Capture en cours…");
+      try {
+        const result = await api("/api/capture", {
+          method: "POST",
+          body: JSON.stringify({ networkIds }),
+        });
+        showSuccess("Inventaire capturé : " + result.deviceCount + " équipement" + (result.deviceCount > 1 ? "s" : "") + " dans " + result.networkCount + " réseau" + (result.networkCount > 1 ? "x" : "") + ". Ouvrez l’onglet Inventaire pour le consulter.");
+      } catch (error) {
+        showMessage(error.message);
+      } finally {
+        setBusy(button, false);
+        updateNetworkSelection();
+      }
     });
 
     (async function restoreSession() {

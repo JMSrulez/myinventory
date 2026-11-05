@@ -3,10 +3,12 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     MERAKI_INVENTORY_HOST=0.0.0.0 \
-    MERAKI_INVENTORY_PORT=8086
+    MERAKI_INVENTORY_PORT=8086 \
+    MERAKI_INVENTORY_DATABASE=/data/inventory.sqlite3
 
 WORKDIR /app
-COPY app.py index.html ./
+COPY app.py index.html inventory.html ./
+RUN mkdir -p /data && chown 10001:10001 /data
 
 USER 10001:10001
 EXPOSE 8086

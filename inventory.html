@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f7f5">
+  <title>Inventaire des réseaux · Inventaire Meraki</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172521; --muted: #64736d; --line: #e2e8e4;
+      --green: #187653; --green-dark: #105a3e; --paper: #fff;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { margin: 0; min-height: 100vh; background: #f5f7f5; color: var(--ink); }
+    .shell { max-width: 1160px; margin: auto; padding: 38px 28px 64px; }
+    header { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 30px; }
+    .brand { display: flex; align-items: center; gap: 14px; }
+    .brand-mark { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 13px; background: #dceee2; color: var(--green-dark); }
+    .brand-mark svg { width: 24px; height: 24px; }
+    .eyebrow { margin: 0 0 5px; color: var(--green); font-size: 11px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(24px, 3vw, 32px); letter-spacing: -.04em; font-weight: 680; }
+    .site-nav { display: flex; gap: 7px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: white; }
+    .nav-link { padding: 7px 11px; border-radius: 7px; color: var(--muted); font-size: 12px; font-weight: 650; text-decoration: none; }
+    .nav-link:hover { color: var(--green-dark); background: #f6f8f6; }
+    .nav-link[aria-current="page"] { background: #eaf4ed; color: var(--green-dark); }
+    .intro { max-width: 760px; margin: 0 0 25px; color: var(--muted); line-height: 1.65; font-size: 15px; }
+    .card { border: 1px solid var(--line); border-radius: 14px; background: var(--paper); box-shadow: 0 3px 14px #193c2910; }
+    .inventory-card { overflow: hidden; }
+    .tabs-wrap { padding: 14px 18px 0; border-bottom: 1px solid var(--line); background: #fbfcfb; }
+    .tabs { display: flex; gap: 5px; overflow-x: auto; }
+    .tab { flex: 0 0 auto; max-width: 260px; overflow: hidden; padding: 11px 14px; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; background: transparent; color: var(--muted); font: inherit; font-size: 13px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+    .tab:hover { color: var(--green-dark); background: #f4f8f5; }
+    .tab[aria-selected="true"] { position: relative; margin-bottom: -1px; border-color: var(--line); background: white; color: var(--green-dark); }
+    .panel { padding: 22px; }
+    .panel-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 16px; }
+    h2 { margin: 0; font-size: 18px; font-weight: 680; letter-spacing: -.015em; }
+    .hint { margin: 6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .count { flex: 0 0 auto; padding: 6px 9px; border-radius: 7px; background: #f0f3f1; color: #46564f; font-size: 12px; font-weight: 650; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 9px; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th, td { padding: 12px 14px; border-bottom: 1px solid #edf0ee; font-size: 13px; }
+    th { background: #f8faf8; color: #64736d; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    tbody tr:last-child td { border-bottom: 0; }
+    td { color: #26352e; }
+    .empty { display: grid; min-height: 220px; place-items: center; padding: 32px; color: #89958f; text-align: center; }
+    .empty-inner { max-width: 380px; }
+    .empty strong { display: block; margin-bottom: 7px; color: #46564f; font-size: 14px; font-weight: 650; }
+    .empty span { font-size: 13px; line-height: 1.6; }
+    .message { margin: 0 0 18px; padding: 12px 15px; border: 1px solid #f0cfcb; border-radius: 9px; background: #fff7f6; color: #a63e39; font-size: 13px; line-height: 1.5; }
+    @media (max-width: 650px) {
+      .shell { padding: 25px 16px 45px; }
+      header { align-items: flex-start; flex-direction: column; margin-bottom: 20px; }
+      .panel { padding: 17px; }
+      .panel-heading { flex-direction: column; }
+      th, td { padding: 10px 11px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5a12 12 0 0 1 16 0M7 13.5a7.5 7.5 0 0 1 10 0M10 16.5a3 3 0 0 1 4 0M12 20h.01"/><path d="M5 4.5h14v15H5z" opacity=".15"/></svg>
+        </div>
+        <div><p class="eyebrow">Outils réseau</p><h1>Inventaire Meraki</h1></div>
+      </div>
+      <nav class="site-nav" aria-label="Navigation principale">
+        <a class="nav-link" href="/">Setup</a>
+        <a class="nav-link" href="/inventory" aria-current="page">Inventaire</a>
+      </nav>
+    </header>
+    <p class="intro">Les équipements sont regroupés par réseau. Une nouvelle capture depuis Setup remplace les données du réseau concerné et conserve les autres inventaires.</p>
+    <div class="message" id="error-message" role="alert" hidden></div>
+    <section class="card inventory-card" aria-label="Inventaire par réseau">
+      <div class="tabs-wrap" id="tabs-wrap" hidden>
+        <div class="tabs" id="network-tabs" role="tablist" aria-label="Réseaux inventoriés"></div>
+      </div>
+      <div class="panel" id="inventory-panel" role="tabpanel" aria-live="polite">
+        <div class="empty"><div class="empty-inner"><strong>Aucun inventaire enregistré</strong><span>Retournez dans Setup, sélectionnez des réseaux et lancez une capture pour afficher les équipements ici.</span></div></div>
+      </div>
+    </section>
+  </main>
+  <script>
+    const tabs = document.getElementById("network-tabs");
+    const panel = document.getElementById("inventory-panel");
+    const errorMessage = document.getElementById("error-message");
+    let networks = [];
+
+    async function api(path) {
+      const response = await fetch(path, { headers: { "Accept": "application/json" } });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Erreur HTTP " + response.status);
+      return data;
+    }
+
+    function formatDate(value) {
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? value : date.toLocaleString("fr-FR");
+    }
+
+    function renderPanel(index) {
+      const network = networks[index];
+      panel.setAttribute("aria-labelledby", "network-tab-" + index);
+      [...tabs.children].forEach((tab, tabIndex) => {
+        const selected = tabIndex === index;
+        tab.setAttribute("aria-selected", String(selected));
+        tab.tabIndex = selected ? 0 : -1;
+      });
+      panel.replaceChildren();
+
+      const heading = document.createElement("div");
+      heading.className = "panel-heading";
+      const details = document.createElement("div");
+      const title = document.createElement("h2");
+      title.textContent = network.name || "Réseau sans nom";
+      const subtitle = document.createElement("p");
+      subtitle.className = "hint";
+      subtitle.textContent = (network.organizationName || "Organisation") + " · Capturé le " + formatDate(network.capturedAt);
+      details.append(title, subtitle);
+      const count = document.createElement("span");
+      count.className = "count";
+      count.textContent = network.devices.length + " équipement" + (network.devices.length > 1 ? "s" : "");
+      heading.append(details, count);
+      panel.append(heading);
+
+      if (!network.devices.length) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "Aucun équipement n’a été renvoyé pour ce réseau.";
+        panel.append(empty);
+        return;
+      }
+
+      const tableWrap = document.createElement("div");
+      tableWrap.className = "table-wrap";
+      const table = document.createElement("table");
+      const head = document.createElement("thead");
+      const headerRow = document.createElement("tr");
+      for (const label of ["Nom", "Modèle", "Numéro de série", "IP de gestion"]) {
+        const cell = document.createElement("th");
+        cell.scope = "col";
+        cell.textContent = label;
+        headerRow.append(cell);
+      }
+      head.append(headerRow);
+      const body = document.createElement("tbody");
+      for (const device of network.devices) {
+        const row = document.createElement("tr");
+        for (const value of [device.name, device.model, device.serial, device.management_ip]) {
+          const cell = document.createElement("td");
+          cell.textContent = value || "—";
+          row.append(cell);
+        }
+        body.append(row);
+      }
+      table.append(head, body);
+      tableWrap.append(table);
+      panel.append(tableWrap);
+    }
+
+    function renderInventory() {
+      tabs.replaceChildren();
+      if (!networks.length) return;
+      document.getElementById("tabs-wrap").hidden = false;
+      networks.forEach((network, index) => {
+        const tab = document.createElement("button");
+        tab.type = "button";
+        tab.className = "tab";
+        tab.id = "network-tab-" + index;
+        tab.setAttribute("role", "tab");
+        tab.setAttribute("aria-controls", "inventory-panel");
+        tab.setAttribute("aria-selected", String(index === 0));
+        tab.tabIndex = index === 0 ? 0 : -1;
+        tab.textContent = network.name || "Réseau sans nom";
+        tab.title = tab.textContent;
+        tab.addEventListener("click", () => renderPanel(index));
+        tab.addEventListener("keydown", (event) => {
+          if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+          event.preventDefault();
+          const direction = event.key === "ArrowRight" ? 1 : -1;
+          const next = (index + direction + networks.length) % networks.length;
+          tabs.children[next].focus();
+          renderPanel(next);
+        });
+        tabs.append(tab);
+      });
+      renderPanel(0);
+    }
+
+    (async function loadInventory() {
+      try {
+        const result = await api("/api/inventory");
+        networks = result.networks || [];
+        renderInventory();
+      } catch (error) {
+        errorMessage.textContent = error.message;
+        errorMessage.hidden = false;
+      }
+    })();
+  </script>
+</body>
+</html>

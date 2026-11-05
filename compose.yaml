@@ -7,5 +7,11 @@ services:
     environment:
       MERAKI_INVENTORY_HOST: 0.0.0.0
       MERAKI_INVENTORY_PORT: ${MERAKI_INVENTORY_PORT:-8086}
+      MERAKI_INVENTORY_DATABASE: /data/inventory.sqlite3
       MERAKI_INVENTORY_ALLOWED_HOSTS: ${MERAKI_INVENTORY_ALLOWED_HOSTS:-127.0.0.1,localhost}
       MERAKI_API_KEY: ${MERAKI_API_KEY:-}
+    volumes:
+      - inventory-data:/data
+
+volumes:
+  inventory-data:
