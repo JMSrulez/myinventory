@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -23,6 +23,9 @@
     .eyebrow { margin: 0 0 5px; color: var(--green); font-size: 11px; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
     h1 { margin: 0; font-size: clamp(24px, 3vw, 32px); letter-spacing: -.04em; font-weight: 680; }
     .site-nav { display: flex; gap: 7px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: white; }
+    .header-actions { display: flex; align-items: flex-start; gap: 10px; }
+    .language-toggle { min-height: 36px; padding: 0 11px; border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--ink); font-size: 12px; font-weight: 650; cursor: pointer; }
+    .language-toggle:hover { background: #f6f8f6; }
     .nav-link { padding: 7px 11px; border-radius: 7px; color: var(--muted); font-size: 12px; font-weight: 650; text-decoration: none; }
     .nav-link:hover { color: var(--green-dark); background: #f6f8f6; }
     .nav-link[aria-current="page"] { background: #eaf4ed; color: var(--green-dark); }
@@ -53,6 +56,7 @@
     @media (max-width: 650px) {
       .shell { padding: 25px 16px 45px; }
       header { align-items: flex-start; flex-direction: column; margin-bottom: 20px; }
+      .header-actions { width: 100%; justify-content: space-between; }
       .panel { padding: 17px; }
       .panel-heading { flex-direction: column; }
       th, td { padding: 10px 11px; }
@@ -66,21 +70,24 @@
         <div class="brand-mark" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5a12 12 0 0 1 16 0M7 13.5a7.5 7.5 0 0 1 10 0M10 16.5a3 3 0 0 1 4 0M12 20h.01"/><path d="M5 4.5h14v15H5z" opacity=".15"/></svg>
         </div>
-        <div><p class="eyebrow">Outils réseau</p><h1>Inventaire Meraki</h1></div>
+        <div><p class="eyebrow" data-i18n="brandEyebrow">Outils réseau</p><h1 data-i18n="brandTitle">Inventaire Meraki</h1></div>
       </div>
-      <nav class="site-nav" aria-label="Navigation principale">
-        <a class="nav-link" href="/">Setup</a>
-        <a class="nav-link" href="/inventory" aria-current="page">Inventaire</a>
-      </nav>
+      <div class="header-actions">
+        <nav class="site-nav" aria-label="Navigation principale" data-i18n-aria-label="mainNavigation">
+          <a class="nav-link" href="/" data-i18n="navSetup">Setup</a>
+          <a class="nav-link" href="/inventory" aria-current="page" data-i18n="navInventory">Inventaire</a>
+        </nav>
+        <button class="language-toggle" id="language-toggle" type="button">English</button>
+      </div>
     </header>
-    <p class="intro">Les équipements sont regroupés par réseau. Une nouvelle capture depuis Setup remplace les données du réseau concerné et conserve les autres inventaires.</p>
+    <p class="intro" data-i18n="inventoryIntro">Les équipements sont regroupés par réseau. Une nouvelle capture depuis Setup remplace les données du réseau concerné et conserve les autres inventaires.</p>
     <div class="message" id="error-message" role="alert" hidden></div>
-    <section class="card inventory-card" aria-label="Inventaire par réseau">
+    <section class="card inventory-card" aria-label="Inventaire par réseau" data-i18n-aria-label="inventoryByNetwork">
       <div class="tabs-wrap" id="tabs-wrap" hidden>
-        <div class="tabs" id="network-tabs" role="tablist" aria-label="Réseaux inventoriés"></div>
+        <div class="tabs" id="network-tabs" role="tablist" aria-label="Réseaux inventoriés" data-i18n-aria-label="inventoriedNetworks"></div>
       </div>
       <div class="panel" id="inventory-panel" role="tabpanel" aria-live="polite">
-        <div class="empty"><div class="empty-inner"><strong>Aucun inventaire enregistré</strong><span>Retournez dans Setup, sélectionnez des réseaux et lancez une capture pour afficher les équipements ici.</span></div></div>
+        <div class="empty"><div class="empty-inner"><strong data-i18n="noInventory">Aucun inventaire enregistré</strong><span data-i18n="goToSetup">Retournez dans Setup, sélectionnez des réseaux et lancez une capture pour afficher les équipements ici.</span></div></div>
       </div>
     </section>
   </main>
@@ -89,20 +96,80 @@
     const panel = document.getElementById("inventory-panel");
     const errorMessage = document.getElementById("error-message");
     let networks = [];
+    let activeNetworkIndex = 0;
+    const translations = {
+      en: {
+        brandEyebrow: "Network tools", brandTitle: "Meraki Inventory", mainNavigation: "Main navigation",
+        navSetup: "Setup", navInventory: "Inventory", inventoryTitle: "Network inventory · Meraki Inventory",
+        inventoryIntro: "Devices are grouped by network. A new capture from Setup replaces data for the selected networks and keeps all other inventories.",
+        inventoryByNetwork: "Inventory by network", inventoriedNetworks: "Inventoried networks",
+        noInventory: "No inventory saved", goToSetup: "Go to Setup, select networks and capture them to display the devices here.",
+        noNetworkName: "Unnamed network", organization: "Organization", capturedOn: "Captured on",
+        device: "device", devices: "devices", noDevices: "No devices were returned for this network.",
+        name: "Name", model: "Model", serialNumber: "Serial number", managementIp: "Management IP",
+        httpError: "HTTP error {status}", errReadInventory: "Could not read the saved inventory.", errLocalOnly: "Local access only.",
+        errPageNotFound: "Page not found."
+      },
+      fr: {
+        brandEyebrow: "Outils réseau", brandTitle: "Inventaire Meraki", mainNavigation: "Navigation principale",
+        navSetup: "Setup", navInventory: "Inventaire", inventoryTitle: "Inventaire des réseaux · Inventaire Meraki",
+        inventoryIntro: "Les équipements sont regroupés par réseau. Une nouvelle capture depuis Setup remplace les données du réseau concerné et conserve les autres inventaires.",
+        inventoryByNetwork: "Inventaire par réseau", inventoriedNetworks: "Réseaux inventoriés",
+        noInventory: "Aucun inventaire enregistré", goToSetup: "Retournez dans Setup, sélectionnez des réseaux et lancez une capture pour afficher les équipements ici.",
+        noNetworkName: "Réseau sans nom", organization: "Organisation", capturedOn: "Capturé le",
+        device: "équipement", devices: "équipements", noDevices: "Aucun équipement n’a été renvoyé pour ce réseau.",
+        name: "Nom", model: "Modèle", serialNumber: "Numéro de série", managementIp: "IP de gestion",
+        httpError: "Erreur HTTP {status}", errReadInventory: "Impossible de lire l’inventaire enregistré.", errLocalOnly: "Accès local uniquement.",
+        errPageNotFound: "Page introuvable."
+      }
+    };
+    function detectLanguage() {
+      try {
+        const saved = localStorage.getItem("meraki-inventory-language");
+        if (saved === "en" || saved === "fr") return saved;
+      } catch (_) { /* Storage may be disabled. */ }
+      const browserLanguage = (navigator.languages && navigator.languages[0]) || navigator.language || "";
+      return /^fr(?:-|$)/i.test(browserLanguage) ? "fr" : "en";
+    }
+    let language = detectLanguage();
+    const t = (key, values = {}) => Object.entries(values).reduce(
+      (text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
+      translations[language][key] || key
+    );
+    const errorKeys = {
+      "Impossible de lire l’inventaire enregistré.": "errReadInventory",
+      "Accès local uniquement.": "errLocalOnly", "Page introuvable.": "errPageNotFound"
+    };
+    function localizeError(message) {
+      if (errorKeys[message]) return t(errorKeys[message]);
+      const match = /^Erreur HTTP (\d+)$/.exec(message);
+      return match ? t("httpError", { status: match[1] }) : message;
+    }
+    function applyStaticTranslations() {
+      document.documentElement.lang = language;
+      document.title = t("inventoryTitle");
+      document.querySelectorAll("[data-i18n]").forEach((element) => { element.textContent = t(element.dataset.i18n); });
+      document.querySelectorAll("[data-i18n-aria-label]").forEach((element) => { element.setAttribute("aria-label", t(element.dataset.i18nAriaLabel)); });
+      const toggle = document.getElementById("language-toggle");
+      toggle.textContent = language === "fr" ? "English" : "Français";
+      toggle.setAttribute("aria-label", language === "fr" ? "Passer la langue en anglais" : "Switch language to French");
+      if (errorMessage.dataset.rawMessage) errorMessage.textContent = localizeError(errorMessage.dataset.rawMessage);
+    }
 
     async function api(path) {
       const response = await fetch(path, { headers: { "Accept": "application/json" } });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Erreur HTTP " + response.status);
+      if (!response.ok) throw new Error(data.error || t("httpError", { status: response.status }));
       return data;
     }
 
     function formatDate(value) {
       const date = new Date(value);
-      return Number.isNaN(date.getTime()) ? value : date.toLocaleString("fr-FR");
+      return Number.isNaN(date.getTime()) ? value : date.toLocaleString(language === "fr" ? "fr-FR" : "en-US");
     }
 
     function renderPanel(index) {
+      activeNetworkIndex = index;
       const network = networks[index];
       panel.setAttribute("aria-labelledby", "network-tab-" + index);
       [...tabs.children].forEach((tab, tabIndex) => {
@@ -116,21 +183,21 @@
       heading.className = "panel-heading";
       const details = document.createElement("div");
       const title = document.createElement("h2");
-      title.textContent = network.name || "Réseau sans nom";
+      title.textContent = network.name || t("noNetworkName");
       const subtitle = document.createElement("p");
       subtitle.className = "hint";
-      subtitle.textContent = (network.organizationName || "Organisation") + " · Capturé le " + formatDate(network.capturedAt);
+      subtitle.textContent = (network.organizationName || t("organization")) + " · " + t("capturedOn") + " " + formatDate(network.capturedAt);
       details.append(title, subtitle);
       const count = document.createElement("span");
       count.className = "count";
-      count.textContent = network.devices.length + " équipement" + (network.devices.length > 1 ? "s" : "");
+      count.textContent = network.devices.length + " " + t(network.devices.length === 1 ? "device" : "devices");
       heading.append(details, count);
       panel.append(heading);
 
       if (!network.devices.length) {
         const empty = document.createElement("div");
         empty.className = "empty";
-        empty.textContent = "Aucun équipement n’a été renvoyé pour ce réseau.";
+        empty.textContent = t("noDevices");
         panel.append(empty);
         return;
       }
@@ -140,10 +207,10 @@
       const table = document.createElement("table");
       const head = document.createElement("thead");
       const headerRow = document.createElement("tr");
-      for (const label of ["Nom", "Modèle", "Numéro de série", "IP de gestion"]) {
+      for (const label of ["name", "model", "serialNumber", "managementIp"]) {
         const cell = document.createElement("th");
         cell.scope = "col";
-        cell.textContent = label;
+        cell.textContent = t(label);
         headerRow.append(cell);
       }
       head.append(headerRow);
@@ -162,9 +229,15 @@
       panel.append(tableWrap);
     }
 
-    function renderInventory() {
+    function applyLanguage() {
+      applyStaticTranslations();
+      if (networks.length) renderInventory(activeNetworkIndex);
+    }
+
+    function renderInventory(selectedIndex = activeNetworkIndex) {
       tabs.replaceChildren();
       if (!networks.length) return;
+      activeNetworkIndex = Math.min(selectedIndex, networks.length - 1);
       document.getElementById("tabs-wrap").hidden = false;
       networks.forEach((network, index) => {
         const tab = document.createElement("button");
@@ -173,9 +246,9 @@
         tab.id = "network-tab-" + index;
         tab.setAttribute("role", "tab");
         tab.setAttribute("aria-controls", "inventory-panel");
-        tab.setAttribute("aria-selected", String(index === 0));
-        tab.tabIndex = index === 0 ? 0 : -1;
-        tab.textContent = network.name || "Réseau sans nom";
+        tab.setAttribute("aria-selected", String(index === activeNetworkIndex));
+        tab.tabIndex = index === activeNetworkIndex ? 0 : -1;
+        tab.textContent = network.name || t("noNetworkName");
         tab.title = tab.textContent;
         tab.addEventListener("click", () => renderPanel(index));
         tab.addEventListener("keydown", (event) => {
@@ -188,7 +261,7 @@
         });
         tabs.append(tab);
       });
-      renderPanel(0);
+      renderPanel(activeNetworkIndex);
     }
 
     (async function loadInventory() {
@@ -197,10 +270,19 @@
         networks = result.networks || [];
         renderInventory();
       } catch (error) {
-        errorMessage.textContent = error.message;
+        errorMessage.dataset.rawMessage = error.message;
+        errorMessage.textContent = localizeError(error.message);
         errorMessage.hidden = false;
       }
     })();
+
+    document.getElementById("language-toggle").addEventListener("click", () => {
+      language = language === "fr" ? "en" : "fr";
+      try { localStorage.setItem("meraki-inventory-language", language); } catch (_) { /* Storage may be disabled. */ }
+      applyLanguage();
+    });
+
+    applyLanguage();
   </script>
 </body>
 </html>

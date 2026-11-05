@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -19,6 +19,9 @@
     .shell { max-width: 1160px; margin: auto; padding: 38px 28px 64px; }
     header { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 30px; }
     .site-nav { display: flex; gap: 7px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: white; }
+    .header-actions { display: flex; align-items: flex-start; gap: 10px; }
+    .language-toggle { min-height: 36px; padding: 0 11px; border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--ink); font-size: 12px; font-weight: 650; cursor: pointer; }
+    .language-toggle:hover { background: #f6f8f6; }
     .nav-link { padding: 7px 11px; border-radius: 7px; color: var(--muted); font-size: 12px; font-weight: 650; text-decoration: none; }
     .nav-link:hover { color: var(--green-dark); background: #f6f8f6; }
     .nav-link[aria-current="page"] { background: #eaf4ed; color: var(--green-dark); }
@@ -85,6 +88,8 @@
     @media (max-width: 740px) {
       .shell { padding: 25px 16px 45px; }
       header { margin-bottom: 20px; }
+      header { align-items: flex-start; flex-direction: column; }
+      .header-actions { width: 100%; justify-content: space-between; }
       .workspace { grid-template-columns: 1fr; }
       .key-form { flex-direction: column; }
       .key-form .button { width: 100%; }
@@ -100,67 +105,200 @@
         <div class="brand-mark" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5a12 12 0 0 1 16 0M7 13.5a7.5 7.5 0 0 1 10 0M10 16.5a3 3 0 0 1 4 0M12 20h.01"/><path d="M5 4.5h14v15H5z" opacity=".15"/></svg>
         </div>
-        <div><p class="eyebrow">Outils réseau</p><h1>Inventaire Meraki</h1></div>
+        <div><p class="eyebrow" data-i18n="brandEyebrow">Outils réseau</p><h1 data-i18n="brandTitle">Inventaire Meraki</h1></div>
       </div>
-      <nav class="site-nav" aria-label="Navigation principale">
-        <a class="nav-link" href="/" aria-current="page">Setup</a>
-        <a class="nav-link" href="/inventory">Inventaire</a>
-      </nav>
+      <div class="header-actions">
+        <nav class="site-nav" aria-label="Navigation principale" data-i18n-aria-label="mainNavigation">
+          <a class="nav-link" href="/" aria-current="page" data-i18n="navSetup">Setup</a>
+          <a class="nav-link" href="/inventory" data-i18n="navInventory">Inventaire</a>
+        </nav>
+        <button class="language-toggle" id="language-toggle" type="button">English</button>
+      </div>
     </header>
-    <p class="intro">Connectez-vous au Dashboard Meraki, choisissez les organisations et les réseaux à inventorier, puis capturez les équipements sélectionnés.</p>
+    <p class="intro" data-i18n="setupIntro">Connectez-vous au Dashboard Meraki, choisissez les organisations et les réseaux à inventorier, puis capturez les équipements sélectionnés.</p>
 
     <section class="card connection" aria-labelledby="connection-title">
       <div class="section-heading">
-        <div><h2 id="connection-title">Connexion au Dashboard</h2><p class="hint" id="connection-description">Utilisez une clé API Meraki autorisée à consulter les organisations et les réseaux.</p></div>
-        <span class="status" id="connection-status"><span class="dot"></span>Connecté</span>
+        <div><h2 id="connection-title" data-i18n="connectionTitle">Connexion au Dashboard</h2><p class="hint" id="connection-description">Utilisez une clé API Meraki autorisée à consulter les organisations et les réseaux.</p></div>
+        <span class="status" id="connection-status"><span class="dot"></span><span id="connection-status-label" data-i18n="connected">Connecté</span></span>
       </div>
       <form class="key-form" id="connect-form">
         <label class="key-wrap" id="key-wrap" for="api-key">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 1 1 8 0v3M12 14v3"/></svg>
-          <span class="sr-only">Clé API Meraki</span>
-          <input id="api-key" type="password" placeholder="Clé API Meraki" autocomplete="off" required>
+          <span class="sr-only" data-i18n="apiKeyLabel">Clé API Meraki</span>
+          <input id="api-key" type="password" placeholder="Clé API Meraki" data-i18n-placeholder="apiKeyLabel" autocomplete="off" required>
         </label>
-        <button class="button button-primary" id="connect-button" type="submit">Se connecter <span aria-hidden="true">→</span></button>
-        <button class="button button-secondary" id="disconnect-button" type="button" hidden>Déconnecter</button>
+        <button class="button button-primary" id="connect-button" type="submit"><span data-i18n="connect">Se connecter</span> <span aria-hidden="true">→</span></button>
+        <button class="button button-secondary" id="disconnect-button" type="button" hidden data-i18n="disconnect">Déconnecter</button>
       </form>
       <p class="connection-note" id="connection-note">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v5.5c0 4.6 3.2 7.8 7.5 9.5 4.3-1.7 7.5-4.9 7.5-9.5V6L12 3Z"/><path d="m9 12 2 2 4-4"/></svg>
-        La clé reste en mémoire pendant l’exécution locale et n’est pas enregistrée dans le navigateur ou sur le disque.
+        <span id="connection-note-label">La clé reste en mémoire pendant l’exécution locale et n’est pas enregistrée dans le navigateur ou sur le disque.</span>
       </p>
     </section>
 
     <div class="message" id="message" role="alert"></div>
-    <section class="workspace" aria-label="Sélection des organisations et réseaux">
+    <section class="workspace" aria-label="Sélection des organisations et réseaux" data-i18n-aria-label="workspaceLabel">
       <section class="card list-card" aria-labelledby="org-title">
-        <div class="list-head"><div class="list-title-line"><h2 id="org-title">Organisations</h2><span class="count" id="org-count">0</span></div><p class="hint">Choisissez une ou plusieurs organisations.</p></div>
-        <div class="list-actions"><span class="hint" id="org-selected">Aucune sélection</span><button class="text-button" id="select-all-orgs" type="button" hidden>Tout sélectionner</button></div>
-        <div class="list-scroll" id="org-list"><div class="empty"><div class="empty-inner"><strong>En attente de connexion</strong><span>Connectez-vous pour charger vos organisations Meraki.</span></div></div></div>
+        <div class="list-head"><div class="list-title-line"><h2 id="org-title" data-i18n="organizations">Organisations</h2><span class="count" id="org-count">0</span></div><p class="hint" data-i18n="organizationsHint">Choisissez une ou plusieurs organisations.</p></div>
+        <div class="list-actions"><span class="hint" id="org-selected">Aucune sélection</span><button class="text-button" id="select-all-orgs" type="button" hidden></button></div>
+        <div class="list-scroll" id="org-list"><div class="empty"><div class="empty-inner"><strong data-i18n="waitingConnection">En attente de connexion</strong><span data-i18n="loginToLoadOrganizations">Connectez-vous pour charger vos organisations Meraki.</span></div></div></div>
       </section>
       <section class="card list-card" aria-labelledby="network-title">
-        <div class="list-head"><div class="list-title-line"><h2 id="network-title">Réseaux</h2><span class="count" id="network-count">0</span></div><p class="hint">Les réseaux des organisations choisies apparaîtront ici.</p></div>
+        <div class="list-head"><div class="list-title-line"><h2 id="network-title" data-i18n="networks">Réseaux</h2><span class="count" id="network-count">0</span></div><p class="hint" data-i18n="networksHint">Les réseaux des organisations choisies apparaîtront ici.</p></div>
         <div class="list-actions">
           <span class="hint" id="network-selected">Aucun réseau chargé</span>
-          <div class="network-tools"><button class="text-button" id="select-all-networks" type="button" hidden>Tout sélectionner</button><button class="button button-secondary" id="load-networks" type="button" disabled>Charger les réseaux</button><button class="button button-primary" id="capture-inventory" type="button" disabled>Capturer la sélection</button></div>
+          <div class="network-tools"><button class="text-button" id="select-all-networks" type="button" hidden></button><button class="button button-secondary" id="load-networks" type="button" disabled data-i18n="loadNetworks">Charger les réseaux</button><button class="button button-primary" id="capture-inventory" type="button" disabled data-i18n="captureSelection">Capturer la sélection</button></div>
         </div>
-        <div class="list-scroll" id="network-list"><div class="empty"><div class="empty-inner"><strong>Aucun réseau affiché</strong><span>Sélectionnez une organisation, puis chargez ses réseaux.</span></div></div></div>
+        <div class="list-scroll" id="network-list"><div class="empty"><div class="empty-inner"><strong data-i18n="noNetworksShown">Aucun réseau affiché</strong><span data-i18n="selectOrganizationLoadNetworks">Sélectionnez une organisation, puis chargez ses réseaux.</span></div></div></div>
       </section>
     </section>
-    <p class="footer-note">La capture met à jour l’inventaire enregistré pour chaque réseau sélectionné. Les autres réseaux déjà capturés restent conservés.</p>
+    <p class="footer-note" data-i18n="captureNote">La capture met à jour l’inventaire enregistré pour chaque réseau sélectionné. Les autres réseaux déjà capturés restent conservés.</p>
   </main>
   <script>
-    const state = { organizations: [], networks: [], networkOrganizationIds: [], networksLoaded: false, keyConfigured: false };
+    const state = { organizations: [], networks: [], networkOrganizationIds: [], networksLoaded: false, keyConfigured: false, connected: false };
     const $ = (id) => document.getElementById(id);
+    const translations = {
+      en: {
+        brandEyebrow: "Network tools", brandTitle: "Meraki Inventory", mainNavigation: "Main navigation",
+        navSetup: "Setup", navInventory: "Inventory", setupTitle: "Setup · Meraki Inventory",
+        setupIntro: "Connect to the Meraki Dashboard, choose the organizations and networks to inventory, then capture the selected devices.",
+        connectionTitle: "Dashboard connection", connectionDescription: "Use a Meraki API key with permission to view organizations and networks.",
+        configuredDescription: "The API key is provided by the server configuration.", connected: "Connected",
+        apiKeyLabel: "Meraki API key", connect: "Connect", disconnect: "Disconnect",
+        manualNote: "The key you enter is held in server memory while it is running.",
+        configuredNote: "The configured key stays on the server and is never sent to the interface.",
+        workspaceLabel: "Organization and network selection", organizations: "Organizations",
+        organizationsHint: "Choose one or more organizations.", selectNone: "No selection",
+        selectAll: "Select all", deselectAll: "Deselect all", waitingConnection: "Waiting for connection",
+        loginToLoadOrganizations: "Connect to load your Meraki organizations.", noOrganizationName: "Unnamed organization",
+        selectOrganization: "Select", networks: "Networks",
+        networksHint: "Networks from the selected organizations will appear here.", noNetworksLoaded: "No networks loaded",
+        loadNetworks: "Load networks", captureSelection: "Capture selection", noNetworksShown: "No networks to show",
+        selectOrganizationLoadNetworks: "Select an organization, then load its networks.", noNetworksFound: "No networks found",
+        noNetworksMatch: "No networks match the selected organizations.", selectOrganizationsLoad: "Select organizations, then load their networks.",
+        noNetworkName: "Unnamed network", organization: "Organization", selectNetwork: "Select",
+        captureNote: "A capture updates the saved inventory for each selected network. Inventories for other networks are kept.",
+        connecting: "Connecting…", loading: "Loading…", capturing: "Capturing…",
+        captured: "Inventory captured: {devices} across {networks}. Open the Inventory tab to view it.",
+        httpError: "HTTP error {status}", errLocalOnly: "Local access only.", errReadInventory: "Could not read the saved inventory.",
+        errPageNotFound: "Page not found.", errInvalidJson: "Invalid JSON request.", errBodyObject: "Request body must be a JSON object.",
+        errApiKeyRequired: "Enter a Meraki API key.", errLogin: "Connect to Meraki first.", errOrganizationSelection: "Invalid organization selection.",
+        errOrganizationUnavailable: "A selected organization is unavailable.", errNetworkSelection: "Invalid network selection.",
+        errNetworkUnavailable: "A selected network is unavailable. Reload the networks.", errSaveInventory: "Could not save the inventory.",
+        errRouteNotFound: "Route not found.", errInvalidApiKey: "Invalid or unauthorized API key. Check the key and its permissions.",
+        errMerakiForbidden: "Meraki denied access. Check the API key permissions.", errMerakiUnavailable: "Could not reach the Meraki API. Check your connection.",
+        errInvalidMerakiJson: "The Meraki API response is not valid JSON.", errUnexpectedMerakiJson: "Unexpected Meraki response format.",
+        errInvalidPagination: "Invalid Meraki pagination link.", errPaginationLoop: "Loop detected in Meraki pagination.",
+        errMerakiResponse: "Unexpected Meraki response (HTTP {status})."
+      },
+      fr: {
+        brandEyebrow: "Outils réseau", brandTitle: "Inventaire Meraki", mainNavigation: "Navigation principale",
+        navSetup: "Setup", navInventory: "Inventaire", setupTitle: "Setup · Inventaire Meraki",
+        setupIntro: "Connectez-vous au Dashboard Meraki, choisissez les organisations et les réseaux à inventorier, puis capturez les équipements sélectionnés.",
+        connectionTitle: "Connexion au Dashboard", connectionDescription: "Utilisez une clé API Meraki autorisée à consulter les organisations et les réseaux.",
+        configuredDescription: "La clé API est fournie par la configuration du serveur.", connected: "Connecté",
+        apiKeyLabel: "Clé API Meraki", connect: "Se connecter", disconnect: "Déconnecter",
+        manualNote: "La clé saisie est conservée en mémoire par le serveur pendant son exécution.",
+        configuredNote: "La clé configurée reste côté serveur et n’est jamais renvoyée à l’interface.",
+        workspaceLabel: "Sélection des organisations et réseaux", organizations: "Organisations",
+        organizationsHint: "Choisissez une ou plusieurs organisations.", selectNone: "Aucune sélection",
+        selectAll: "Tout sélectionner", deselectAll: "Tout désélectionner", waitingConnection: "En attente de connexion",
+        loginToLoadOrganizations: "Connectez-vous pour charger vos organisations Meraki.", noOrganizationName: "Organisation sans nom",
+        selectOrganization: "Sélectionner", networks: "Réseaux",
+        networksHint: "Les réseaux des organisations choisies apparaîtront ici.", noNetworksLoaded: "Aucun réseau chargé",
+        loadNetworks: "Charger les réseaux", captureSelection: "Capturer la sélection", noNetworksShown: "Aucun réseau affiché",
+        selectOrganizationLoadNetworks: "Sélectionnez une organisation, puis chargez ses réseaux.", noNetworksFound: "Aucun réseau trouvé",
+        noNetworksMatch: "Aucun réseau ne correspond aux organisations sélectionnées.", selectOrganizationsLoad: "Sélectionnez des organisations, puis chargez leurs réseaux.",
+        noNetworkName: "Réseau sans nom", organization: "Organisation", selectNetwork: "Sélectionner",
+        captureNote: "La capture met à jour l’inventaire enregistré pour chaque réseau sélectionné. Les autres réseaux déjà capturés restent conservés.",
+        connecting: "Connexion…", loading: "Chargement…", capturing: "Capture en cours…",
+        captured: "Inventaire capturé : {devices} dans {networks}. Ouvrez l’onglet Inventaire pour le consulter.",
+        httpError: "Erreur HTTP {status}", errLocalOnly: "Accès local uniquement.", errReadInventory: "Impossible de lire l’inventaire enregistré.",
+        errPageNotFound: "Page introuvable.", errInvalidJson: "Requête JSON invalide.", errBodyObject: "Le corps doit être un objet JSON.",
+        errApiKeyRequired: "Saisissez une clé API Meraki.", errLogin: "Connectez-vous d’abord à Meraki.", errOrganizationSelection: "Sélection d’organisations invalide.",
+        errOrganizationUnavailable: "Une organisation sélectionnée n’est pas disponible.", errNetworkSelection: "Sélection de réseaux invalide.",
+        errNetworkUnavailable: "Un réseau sélectionné n’est pas disponible. Rechargez les réseaux.", errSaveInventory: "Impossible d’enregistrer l’inventaire.",
+        errRouteNotFound: "Route introuvable.", errInvalidApiKey: "Clé API invalide ou non autorisée. Vérifiez la clé et ses permissions.",
+        errMerakiForbidden: "Accès refusé par Meraki. Vérifiez les permissions de la clé API.", errMerakiUnavailable: "Impossible de joindre l’API Meraki. Vérifiez votre connexion.",
+        errInvalidMerakiJson: "La réponse de l’API Meraki n’est pas un JSON valide.", errUnexpectedMerakiJson: "Format de réponse Meraki inattendu.",
+        errInvalidPagination: "Lien de pagination Meraki invalide.", errPaginationLoop: "Boucle détectée dans la pagination Meraki.",
+        errMerakiResponse: "Réponse Meraki inattendue (HTTP {status})."
+      }
+    };
+    function detectLanguage() {
+      try {
+        const saved = localStorage.getItem("meraki-inventory-language");
+        if (saved === "en" || saved === "fr") return saved;
+      } catch (_) { /* Storage may be disabled. */ }
+      const browserLanguage = (navigator.languages && navigator.languages[0]) || navigator.language || "";
+      return /^fr(?:-|$)/i.test(browserLanguage) ? "fr" : "en";
+    }
+    let language = detectLanguage();
+    const t = (key, values = {}) => Object.entries(values).reduce(
+      (text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
+      translations[language][key] || key
+    );
+    const errorKeys = {
+      "Accès local uniquement.": "errLocalOnly", "Impossible de lire l’inventaire enregistré.": "errReadInventory",
+      "Page introuvable.": "errPageNotFound", "Requête JSON invalide.": "errInvalidJson",
+      "Le corps doit être un objet JSON.": "errBodyObject", "Saisissez une clé API Meraki.": "errApiKeyRequired",
+      "Connectez-vous d’abord à Meraki.": "errLogin", "Sélection d’organisations invalide.": "errOrganizationSelection",
+      "Une organisation sélectionnée n’est pas disponible.": "errOrganizationUnavailable", "Sélection de réseaux invalide.": "errNetworkSelection",
+      "Un réseau sélectionné n’est pas disponible. Rechargez les réseaux.": "errNetworkUnavailable",
+      "Impossible d’enregistrer l’inventaire.": "errSaveInventory", "Route introuvable.": "errRouteNotFound",
+      "Clé API invalide ou non autorisée. Vérifiez la clé et ses permissions.": "errInvalidApiKey",
+      "Accès refusé par Meraki. Vérifiez les permissions de la clé API.": "errMerakiForbidden",
+      "Impossible de joindre l’API Meraki. Vérifiez votre connexion.": "errMerakiUnavailable",
+      "La réponse de l’API Meraki n’est pas un JSON valide.": "errInvalidMerakiJson",
+      "Format de réponse Meraki inattendu.": "errUnexpectedMerakiJson", "Lien de pagination Meraki invalide.": "errInvalidPagination",
+      "Boucle détectée dans la pagination Meraki.": "errPaginationLoop"
+    };
+    function localizeError(message) {
+      if (errorKeys[message]) return t(errorKeys[message]);
+      const merakiResponse = /^Réponse Meraki inattendue \(HTTP (\d+)\)\.$/.exec(message);
+      if (merakiResponse) return t("errMerakiResponse", { status: merakiResponse[1] });
+      const httpError = /^Erreur HTTP (\d+)$/.exec(message);
+      if (httpError) return t("httpError", { status: httpError[1] });
+      return message;
+    }
+    function applyStaticTranslations() {
+      document.documentElement.lang = language;
+      document.title = t("setupTitle");
+      document.querySelectorAll("[data-i18n]").forEach((element) => { element.textContent = t(element.dataset.i18n); });
+      document.querySelectorAll("[data-i18n-aria-label]").forEach((element) => { element.setAttribute("aria-label", t(element.dataset.i18nAriaLabel)); });
+      document.querySelectorAll("[data-i18n-placeholder]").forEach((element) => { element.placeholder = t(element.dataset.i18nPlaceholder); });
+      const toggle = $("language-toggle");
+      toggle.textContent = language === "fr" ? "English" : "Français";
+      toggle.setAttribute("aria-label", language === "fr" ? "Passer la langue en anglais" : "Switch language to French");
+    }
 
     function showMessage(message) {
       const box = $("message");
-      box.textContent = message || "";
-      box.classList.toggle("visible", Boolean(message));
+      box.dataset.rawMessage = message || "";
+      const localized = message ? localizeError(message) : "";
+      box.textContent = localized;
+      box.classList.toggle("visible", Boolean(localized));
       box.classList.remove("success");
     }
 
-    function showSuccess(message) {
+    function showSuccess(message, deviceCount, networkCount) {
       showMessage(message);
       $("message").classList.add("success");
+      if (deviceCount !== undefined && networkCount !== undefined) {
+        $("message").dataset.deviceCount = deviceCount;
+        $("message").dataset.networkCount = networkCount;
+      }
+    }
+
+    function formatCaptureSuccess(deviceCount, networkCount) {
+      const deviceText = language === "fr"
+        ? deviceCount + " équipement" + (deviceCount > 1 ? "s" : "")
+        : deviceCount + " device" + (deviceCount === 1 ? "" : "s");
+      const networkText = language === "fr"
+        ? networkCount + " réseau" + (networkCount > 1 ? "x" : "")
+        : networkCount + " network" + (networkCount === 1 ? "" : "s");
+      return t("captured", { devices: deviceText, networks: networkText });
     }
 
     async function api(path, options = {}) {
@@ -169,44 +307,73 @@
         headers: { "Content-Type": "application/json", ...(options.headers || {}) },
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Erreur HTTP " + response.status);
+      if (!response.ok) throw new Error(data.error || t("httpError", { status: response.status }));
       return data;
     }
 
-    function setBusy(button, busy, label) {
+    function setBusy(button, busy, labelKey) {
       button.disabled = busy;
       if (busy) {
         button.dataset.originalLabel = button.innerHTML;
-        button.textContent = label;
+        button.dataset.busyKey = labelKey;
+        button.textContent = t(labelKey);
       } else if (button.dataset.originalLabel) {
         button.innerHTML = button.dataset.originalLabel;
         delete button.dataset.originalLabel;
+        delete button.dataset.busyKey;
+        applyStaticTranslations();
       }
     }
 
     function setConnected(connected, configured = state.keyConfigured) {
+      state.connected = connected;
       state.keyConfigured = configured;
       $("connection-status").classList.toggle("visible", connected);
       $("key-wrap").hidden = configured;
       $("api-key").required = !configured;
       $("api-key").disabled = connected || configured;
-      $("connection-description").textContent = configured
-        ? "La clé API est fournie par la configuration du serveur."
-        : "Utilisez une clé API Meraki autorisée à consulter les organisations et les réseaux.";
-      $("connection-note").textContent = configured
-        ? "La clé configurée reste côté serveur et n’est jamais renvoyée à l’interface."
-        : "La clé saisie est conservée en mémoire par le serveur pendant son exécution.";
+      $("connection-description").textContent = configured ? t("configuredDescription") : t("connectionDescription");
+      $("connection-note-label").textContent = configured ? t("configuredNote") : t("manualNote");
       $("connect-button").hidden = connected;
       $("disconnect-button").hidden = !connected;
     }
 
+    function applyLanguage() {
+      applyStaticTranslations();
+      setConnected(state.connected, state.keyConfigured);
+      renderOrganizations();
+      renderNetworks();
+      document.querySelectorAll("[data-busy-key]").forEach((button) => { button.textContent = t(button.dataset.busyKey); });
+      const message = $("message");
+      if (message.classList.contains("visible")) {
+        message.textContent = message.classList.contains("success") && message.dataset.deviceCount !== undefined
+          ? formatCaptureSuccess(Number(message.dataset.deviceCount), Number(message.dataset.networkCount))
+          : localizeError(message.dataset.rawMessage || message.textContent);
+      }
+    }
+
+    function renderEmpty(list, title, detail) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      const inner = document.createElement("div");
+      inner.className = "empty-inner";
+      const heading = document.createElement("strong");
+      heading.textContent = title;
+      const description = document.createElement("span");
+      description.textContent = detail;
+      inner.append(heading, description);
+      empty.append(inner);
+      list.replaceChildren(empty);
+    }
+
     function renderOrganizations() {
       const list = $("org-list");
+      const previouslySelected = new Set([...document.querySelectorAll(".org-check:checked")].map((box) => box.value));
       $("org-count").textContent = state.organizations.length;
       $("select-all-orgs").hidden = state.organizations.length === 0;
       if (!state.organizations.length) {
-        list.innerHTML = '<div class="empty"><div class="empty-inner"><strong>En attente de connexion</strong><span>Connectez-vous pour charger vos organisations Meraki.</span></div></div>';
-        $("org-selected").textContent = "Aucune sélection";
+        renderEmpty(list, t("waitingConnection"), t("loginToLoadOrganizations"));
+        $("org-selected").textContent = t("selectNone");
         return;
       }
       list.replaceChildren(...state.organizations.map((org) => {
@@ -216,14 +383,15 @@
         checkbox.type = "checkbox";
         checkbox.value = String(org.id);
         checkbox.className = "org-check";
-        checkbox.setAttribute("aria-label", "Sélectionner " + (org.name || org.id));
+        checkbox.setAttribute("aria-label", t("selectOrganization") + " " + (org.name || org.id));
+        checkbox.checked = previouslySelected.has(checkbox.value);
         checkbox.addEventListener("change", updateSelection);
         const content = document.createElement("span");
         content.className = "row-content";
         const name = document.createElement("span");
         name.className = "row-name";
         const title = document.createElement("span");
-        title.textContent = org.name || "Organisation sans nom";
+        title.textContent = org.name || t("noOrganizationName");
         const id = document.createElement("span");
         id.className = "row-id";
         id.textContent = org.id || "";
@@ -245,24 +413,37 @@
         state.networksLoaded = false;
         renderNetworks();
       }
-      $("org-selected").textContent = selected.length ? selected.length + " sélectionnée" + (selected.length > 1 ? "s" : "") : "Aucune sélection";
-      $("select-all-orgs").textContent = selected.length === state.organizations.length ? "Tout désélectionner" : "Tout sélectionner";
+      $("org-selected").textContent = selected.length
+        ? language === "fr"
+          ? selected.length + " organisation" + (selected.length > 1 ? "s sélectionnées" : " sélectionnée")
+          : selected.length + " selected"
+        : t("selectNone");
+      $("select-all-orgs").textContent = selected.length === state.organizations.length ? t("deselectAll") : t("selectAll");
       $("load-networks").disabled = selected.length === 0;
     }
 
     function renderNetworks() {
       const list = $("network-list");
+      const previouslySelected = new Set([...document.querySelectorAll(".network-check:checked")].map((box) => box.value));
       $("network-count").textContent = state.networks.length;
       $("select-all-networks").hidden = state.networks.length === 0;
       if (!state.networks.length) {
-        const title = state.networksLoaded ? "Aucun réseau trouvé" : "Aucun réseau affiché";
-        const detail = state.networksLoaded ? "Aucun réseau ne correspond aux organisations sélectionnées." : "Sélectionnez des organisations, puis chargez leurs réseaux.";
-        list.innerHTML = '<div class="empty"><div class="empty-inner"><strong>' + title + '</strong><span>' + detail + '</span></div></div>';
-        $("network-selected").textContent = state.networksLoaded ? "0 réseau chargé" : "Aucun réseau chargé";
+        const title = state.networksLoaded ? t("noNetworksFound") : t("noNetworksShown");
+        const detail = state.networksLoaded ? t("noNetworksMatch") : t("selectOrganizationsLoad");
+        renderEmpty(list, title, detail);
         updateNetworkSelection();
         return;
       }
       const orgNames = new Map(state.organizations.map((org) => [String(org.id), org.name || org.id]));
+      const productLabels = {
+        appliance: { en: "Security appliance", fr: "Sécurité" },
+        wireless: { en: "Wireless", fr: "Wi-Fi" },
+        switch: { en: "Switch", fr: "Commutateur" },
+        camera: { en: "Camera", fr: "Caméra" },
+        cellularGateway: { en: "Cellular gateway", fr: "Passerelle cellulaire" },
+        sensor: { en: "Sensor", fr: "Capteur" },
+        systemsManager: { en: "Systems Manager", fr: "Systems Manager" }
+      };
       list.replaceChildren(...state.networks.map((network) => {
         const label = document.createElement("label");
         label.className = "row";
@@ -270,14 +451,15 @@
         checkbox.type = "checkbox";
         checkbox.className = "network-check";
         checkbox.value = String(network.id);
-        checkbox.setAttribute("aria-label", "Sélectionner " + (network.name || network.id));
+        checkbox.setAttribute("aria-label", t("selectNetwork") + " " + (network.name || network.id));
+        checkbox.checked = previouslySelected.has(checkbox.value);
         checkbox.addEventListener("change", updateNetworkSelection);
         const content = document.createElement("span");
         content.className = "row-content";
         const name = document.createElement("span");
         name.className = "row-name";
         const title = document.createElement("span");
-        title.textContent = network.name || "Réseau sans nom";
+        title.textContent = network.name || t("noNetworkName");
         const id = document.createElement("span");
         id.className = "row-id";
         id.textContent = network.id || "";
@@ -286,12 +468,12 @@
         meta.className = "row-meta";
         const orgTag = document.createElement("span");
         orgTag.className = "tag";
-        orgTag.textContent = orgNames.get(String(network.organizationId)) || "Organisation";
+        orgTag.textContent = orgNames.get(String(network.organizationId)) || t("organization");
         meta.append(orgTag);
         for (const product of (network.productTypes || [])) {
           const tag = document.createElement("span");
           tag.className = "tag";
-          tag.textContent = product;
+          tag.textContent = productLabels[product]?.[language] || product;
           meta.append(tag);
         }
         content.append(name, meta);
@@ -303,8 +485,12 @@
 
     function updateNetworkSelection() {
       const selected = document.querySelectorAll(".network-check:checked").length;
-      $("network-selected").textContent = selected + " réseau" + (selected > 1 ? "x" : "") + " sélectionné" + (selected > 1 ? "s" : "");
-      $("select-all-networks").textContent = selected === state.networks.length ? "Tout désélectionner" : "Tout sélectionner";
+      $("network-selected").textContent = !state.networks.length
+        ? state.networksLoaded ? (language === "fr" ? "0 réseau chargé" : "0 networks loaded") : t("noNetworksLoaded")
+        : language === "fr"
+          ? selected + " réseau" + (selected > 1 ? "x" : "") + " sélectionné" + (selected > 1 ? "s" : "")
+          : selected + " network" + (selected === 1 ? "" : "s") + " selected";
+      $("select-all-networks").textContent = selected === state.networks.length ? t("deselectAll") : t("selectAll");
       $("capture-inventory").disabled = selected === 0;
     }
 
@@ -312,7 +498,7 @@
       event.preventDefault();
       showMessage("");
       const button = $("connect-button");
-      setBusy(button, true, "Connexion…");
+      setBusy(button, true, "connecting");
       try {
         const result = await api("/api/connect", {
           method: "POST",
@@ -351,7 +537,7 @@
       const boxes = [...document.querySelectorAll(".org-check")];
       const select = boxes.some((box) => !box.checked);
       boxes.forEach((box) => { box.checked = select; });
-      $("select-all-orgs").textContent = select ? "Tout désélectionner" : "Tout sélectionner";
+      $("select-all-orgs").textContent = select ? t("deselectAll") : t("selectAll");
       updateSelection();
     });
 
@@ -359,7 +545,7 @@
       showMessage("");
       const button = $("load-networks");
       const orgIds = [...document.querySelectorAll(".org-check:checked")].map((box) => box.value);
-      setBusy(button, true, "Chargement…");
+      setBusy(button, true, "loading");
       try {
         const result = await api("/api/networks", {
           method: "POST",
@@ -377,7 +563,7 @@
       const boxes = [...document.querySelectorAll(".network-check")];
       const select = boxes.some((box) => !box.checked);
       boxes.forEach((box) => { box.checked = select; });
-      $("select-all-networks").textContent = select ? "Tout désélectionner" : "Tout sélectionner";
+      $("select-all-networks").textContent = select ? t("deselectAll") : t("selectAll");
       updateNetworkSelection();
     });
 
@@ -385,13 +571,13 @@
       showMessage("");
       const button = $("capture-inventory");
       const networkIds = [...document.querySelectorAll(".network-check:checked")].map((box) => box.value);
-      setBusy(button, true, "Capture en cours…");
+      setBusy(button, true, "capturing");
       try {
         const result = await api("/api/capture", {
           method: "POST",
           body: JSON.stringify({ networkIds }),
         });
-        showSuccess("Inventaire capturé : " + result.deviceCount + " équipement" + (result.deviceCount > 1 ? "s" : "") + " dans " + result.networkCount + " réseau" + (result.networkCount > 1 ? "x" : "") + ". Ouvrez l’onglet Inventaire pour le consulter.");
+        showSuccess(formatCaptureSuccess(result.deviceCount, result.networkCount), result.deviceCount, result.networkCount);
       } catch (error) {
         showMessage(error.message);
       } finally {
@@ -399,6 +585,14 @@
         updateNetworkSelection();
       }
     });
+
+    $("language-toggle").addEventListener("click", () => {
+      language = language === "fr" ? "en" : "fr";
+      try { localStorage.setItem("meraki-inventory-language", language); } catch (_) { /* Storage may be disabled. */ }
+      applyLanguage();
+    });
+
+    applyLanguage();
 
     (async function restoreSession() {
       try {
