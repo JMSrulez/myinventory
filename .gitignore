@@ -1,0 +1,4 @@
+.env
+/secrets/meraki_api_key.txt
+__pycache__/
+*.py[cod]

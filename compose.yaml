@@ -1,0 +1,11 @@
+services:
+  meraki-inventory:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${PUBLISHED_BIND_IP:-127.0.0.1}:${PUBLISHED_PORT:-8000}:8000"
+    environment:
+      MERAKI_INVENTORY_HOST: 0.0.0.0
+      MERAKI_INVENTORY_PORT: 8000
+      MERAKI_INVENTORY_ALLOWED_HOSTS: ${MERAKI_INVENTORY_ALLOWED_HOSTS:-127.0.0.1,localhost}
+      MERAKI_API_KEY: ${MERAKI_API_KEY:-}
