@@ -11,7 +11,4 @@ services:
       MERAKI_INVENTORY_ALLOWED_HOSTS: ${MERAKI_INVENTORY_ALLOWED_HOSTS:-127.0.0.1,localhost}
       MERAKI_API_KEY: ${MERAKI_API_KEY:-}
     volumes:
-      - inventory-data:/data
-
-volumes:
-  inventory-data:
+      - ./data:/data

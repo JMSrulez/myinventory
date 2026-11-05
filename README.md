@@ -13,8 +13,9 @@ Cette méthode convient à une installation Docker Compose sur un hôte maîtris
 1. Copiez `.env.example` vers `.env`.
 2. Renseignez `MERAKI_API_KEY` et, si nécessaire, ajustez `PUBLISHED_PORT` (port de l’hôte) et `MERAKI_INVENTORY_PORT` (port d’écoute dans le conteneur).
 3. Restreignez l’accès au fichier : `chmod 600 .env`.
-4. Démarrez l’application avec `docker compose up -d --build`.
-5. Ouvrez `http://127.0.0.1:8086`.
+4. Créez le dossier de données et donnez-en l’accès à l’utilisateur du conteneur : `sudo install -d -o 10001 -g 10001 -m 0750 data`.
+5. Démarrez l’application avec `docker compose up -d --build`.
+6. Ouvrez `http://127.0.0.1:8086`.
 
 Le fichier `.env` est exclu de Git. La clé n’est pas incluse dans l’image Docker. Elle est lue au démarrage et n’est jamais renvoyée à la page web.
 
@@ -54,4 +55,13 @@ Python 3.10 ou plus récent est requis. Aucun paquet tiers n’est nécessaire. 
 - stockage du nom, modèle, numéro de série et IP de gestion (`lanIp`) de chaque équipement;
 - consultation de l’inventaire dans un onglet par réseau depuis la page Inventaire.
 
-Les données sont conservées dans la base SQLite du volume Docker `inventory-data`, y compris après la recréation du conteneur. Elles ne sont supprimées qu’en supprimant explicitement ce volume.
+La base SQLite est stockée dans `./data/inventory.sqlite3` sur l’hôte et montée dans le conteneur sous `/data`. Elle reste donc dans le dossier du projet quand le conteneur est supprimé ou recréé. Le dossier `data/` est exclu de Git.
+
+Lors du passage depuis l’ancienne configuration qui utilisait un volume Docker nommé, copiez d’abord la base existante avant de récupérer cette version, afin de conserver l’inventaire :
+
+    docker compose stop meraki-inventory
+    mkdir -p data
+    docker cp "$(docker compose ps -aq meraki-inventory):/data/inventory.sqlite3" ./data/inventory.sqlite3
+    sudo chown -R 10001:10001 data
+
+Le volume Docker nommé précédent n’est pas supprimé par ce changement. Il pourra être supprimé manuellement après avoir vérifié que l’inventaire est bien présent dans `data/inventory.sqlite3`.
