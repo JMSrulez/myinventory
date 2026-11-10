@@ -30,6 +30,7 @@
     .nav-link:hover { color: var(--green-dark); background: #f6f8f6; }
     .nav-link[aria-current="page"] { background: #eaf4ed; color: var(--green-dark); }
     .intro { max-width: 760px; margin: 0 0 25px; color: var(--muted); line-height: 1.65; font-size: 15px; }
+    .inventory-toolbar { display: flex; justify-content: flex-end; margin: -10px 0 17px; }
     .card { border: 1px solid var(--line); border-radius: 14px; background: var(--paper); box-shadow: 0 3px 14px #193c2910; }
     .inventory-card { overflow: hidden; }
     .tabs-wrap { padding: 14px 18px 0; border-bottom: 1px solid var(--line); background: #fbfcfb; }
@@ -68,6 +69,7 @@
       .shell { padding: 25px 16px 45px; }
       header { align-items: flex-start; flex-direction: column; margin-bottom: 20px; }
       .header-actions { width: 100%; justify-content: space-between; }
+      .inventory-toolbar { justify-content: flex-start; margin-top: -5px; }
       .panel { padding: 17px; }
       .panel-heading { flex-direction: column; }
       th, td { padding: 10px 11px; }
@@ -93,6 +95,9 @@
       </div>
     </header>
     <p class="intro" data-i18n="inventoryIntro">Les équipements sont regroupés par réseau. Une nouvelle capture depuis Setup remplace les données du réseau concerné et conserve les autres inventaires.</p>
+    <div class="inventory-toolbar">
+      <button class="action-button" id="export-inventory" type="button" data-i18n="exportInventory" disabled>Exporter en Excel</button>
+    </div>
     <div class="message" id="error-message" role="alert" hidden></div>
     <section class="card inventory-card" aria-label="Inventaire par réseau" data-i18n-aria-label="inventoryByNetwork">
       <div class="tabs-wrap" id="tabs-wrap" hidden>
@@ -115,6 +120,7 @@
         navSetup: "Setup", navInventory: "Inventory", navProxmox: "Proxmox", inventoryTitle: "Network inventory · Meraki Inventory",
         inventoryIntro: "Devices are grouped by network. A new capture from Setup replaces data for the selected networks and keeps all other inventories.",
         inventoryByNetwork: "Inventory by network", inventoriedNetworks: "Inventoried networks",
+        exportInventory: "Export to Excel", exportingInventory: "Preparing Excel file…",
         noInventory: "No inventory saved", goToSetup: "Go to Setup, select networks and capture them to display the devices here.",
         noNetworkName: "Unnamed network", organization: "Organization", capturedOn: "Captured on",
         device: "device", devices: "devices", noDevices: "No devices were returned for this network.",
@@ -125,6 +131,7 @@
         currentVersion: "Current version", status: "Status", statusOnline: "Online", statusOffline: "Offline",
         statusAlerting: "Alerting", statusDormant: "Dormant",
         httpError: "HTTP error {status}", errReadInventory: "Could not read the saved inventory.", errLocalOnly: "Local access only.",
+        errExportInventory: "Could not export the inventory.",
         errConnectMeraki: "Connect to Meraki from Setup before refreshing an inventory.",
         errNetworkNotFound: "This network inventory could not be found.", errSaveInventory: "Could not save the refreshed inventory.",
         errDeleteInventory: "Could not delete the inventory.",
@@ -135,6 +142,7 @@
         navSetup: "Setup", navInventory: "Inventaire", navProxmox: "Proxmox", inventoryTitle: "Inventaire des réseaux · Inventaire Meraki",
         inventoryIntro: "Les équipements sont regroupés par réseau. Une nouvelle capture depuis Setup remplace les données du réseau concerné et conserve les autres inventaires.",
         inventoryByNetwork: "Inventaire par réseau", inventoriedNetworks: "Réseaux inventoriés",
+        exportInventory: "Exporter en Excel", exportingInventory: "Préparation du fichier Excel…",
         noInventory: "Aucun inventaire enregistré", goToSetup: "Retournez dans Setup, sélectionnez des réseaux et lancez une capture pour afficher les équipements ici.",
         noNetworkName: "Réseau sans nom", organization: "Organisation", capturedOn: "Capturé le",
         device: "équipement", devices: "équipements", noDevices: "Aucun équipement n’a été renvoyé pour ce réseau.",
@@ -145,6 +153,7 @@
         currentVersion: "Version actuelle", status: "Statut", statusOnline: "En ligne", statusOffline: "Hors ligne",
         statusAlerting: "En alerte", statusDormant: "Inactif",
         httpError: "Erreur HTTP {status}", errReadInventory: "Impossible de lire l’inventaire enregistré.", errLocalOnly: "Accès local uniquement.",
+        errExportInventory: "Impossible d’exporter l’inventaire.",
         errConnectMeraki: "Connectez-vous à Meraki depuis Setup avant d’actualiser un inventaire.",
         errNetworkNotFound: "Cet inventaire réseau est introuvable.", errSaveInventory: "Impossible d’enregistrer l’inventaire actualisé.",
         errDeleteInventory: "Impossible de supprimer l’inventaire.",
@@ -166,6 +175,7 @@
     );
     const errorKeys = {
       "Impossible de lire l’inventaire enregistré.": "errReadInventory",
+      "Impossible de générer le fichier Excel.": "errExportInventory",
       "Accès local uniquement.": "errLocalOnly", "Page introuvable.": "errPageNotFound",
       "Connectez-vous d’abord à Meraki.": "errConnectMeraki",
       "Réseau introuvable dans l’inventaire.": "errNetworkNotFound",
@@ -318,6 +328,7 @@
 
     function renderInventory(selectedIndex = activeNetworkIndex) {
       tabs.replaceChildren();
+      document.getElementById("export-inventory").disabled = networks.length === 0;
       if (!networks.length) {
         renderEmptyInventory();
         return;
@@ -420,6 +431,36 @@
       language = language === "fr" ? "en" : "fr";
       try { localStorage.setItem("meraki-inventory-language", language); } catch (_) { /* Storage may be disabled. */ }
       applyLanguage();
+    });
+
+    document.getElementById("export-inventory").addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      errorMessage.hidden = true;
+      button.disabled = true;
+      button.textContent = t("exportingInventory");
+      try {
+        const response = await fetch("/api/inventory/export", {
+          headers: { "Accept": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }
+        });
+        if (!response.ok) {
+          let data = {};
+          try { data = await response.json(); } catch (_) { /* Use the HTTP status when no JSON error is available. */ }
+          throw new Error(data.error || t("errExportInventory"));
+        }
+        const url = URL.createObjectURL(await response.blob());
+        const download = document.createElement("a");
+        download.href = url;
+        download.download = "inventaire-meraki.xlsx";
+        document.body.append(download);
+        download.click();
+        download.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+      } catch (error) {
+        showMessage(error.message);
+      } finally {
+        button.disabled = networks.length === 0;
+        button.textContent = t("exportInventory");
+      }
     });
 
     applyLanguage();

@@ -1,11 +1,14 @@
 """Local Meraki inventory collector."""
 from __future__ import annotations
 
+import io
 import json
 import os
 import re
 import sqlite3
 import time
+import zipfile
+import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -97,6 +100,119 @@ def read_inventory() -> list[dict[str, Any]]:
                 "devices": [dict(device) for device in devices],
             })
     return result
+
+
+def build_inventory_xlsx(networks: list[dict[str, Any]]) -> bytes:
+    """Build a small, dependency-free XLSX workbook with one sheet per network."""
+    spreadsheet_ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+    document_rel_ns = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+    package_rel_ns = "http://schemas.openxmlformats.org/package/2006/relationships"
+    content_types_ns = "http://schemas.openxmlformats.org/package/2006/content-types"
+    ET.register_namespace("", spreadsheet_ns)
+    ET.register_namespace("r", document_rel_ns)
+
+    def tag(namespace: str, name: str) -> str:
+        return "{" + namespace + "}" + name
+
+    def column_name(index: int) -> str:
+        name = ""
+        while index:
+            index, remainder = divmod(index - 1, 26)
+            name = chr(65 + remainder) + name
+        return name
+
+    def add_cell(row: ET.Element, reference: str, value: Any) -> None:
+        cell = ET.SubElement(row, tag(spreadsheet_ns, "c"), {"r": reference, "t": "inlineStr"})
+        inline = ET.SubElement(cell, tag(spreadsheet_ns, "is"))
+        text = ET.SubElement(inline, tag(spreadsheet_ns, "t"))
+        value_text = "" if value is None else str(value)
+        text.text = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F]", "", value_text)
+
+    workbook = ET.Element(tag(spreadsheet_ns, "workbook"))
+    sheets = ET.SubElement(workbook, tag(spreadsheet_ns, "sheets"))
+    workbook_rels = ET.Element(tag(package_rel_ns, "Relationships"))
+    content_types = ET.Element(tag(content_types_ns, "Types"))
+    ET.SubElement(content_types, tag(content_types_ns, "Default"), {
+        "Extension": "rels", "ContentType": "application/vnd.openxmlformats-package.relationships+xml",
+    })
+    ET.SubElement(content_types, tag(content_types_ns, "Default"), {
+        "Extension": "xml", "ContentType": "application/xml",
+    })
+    ET.SubElement(content_types, tag(content_types_ns, "Override"), {
+        "PartName": "/xl/workbook.xml",
+        "ContentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+    })
+
+    worksheet_files: list[tuple[str, bytes]] = []
+    used_names: set[str] = set()
+    export_networks = networks or [{"name": "Inventaire", "organizationName": "", "capturedAt": "", "devices": []}]
+    headers = ["Nom", "Modèle", "Numéro de série", "IP de gestion", "Version actuelle", "Statut"]
+    for sheet_index, network in enumerate(export_networks, start=1):
+        base_name = re.sub(r"[\\/*?:\[\]]", " ", str(network.get("name") or "Réseau sans nom"))
+        base_name = base_name.strip().strip("'") or "Réseau"
+        sheet_name = base_name[:31]
+        suffix_number = 2
+        while sheet_name.casefold() in used_names:
+            suffix = " (" + str(suffix_number) + ")"
+            sheet_name = base_name[:31 - len(suffix)] + suffix
+            suffix_number += 1
+        used_names.add(sheet_name.casefold())
+        ET.SubElement(sheets, tag(spreadsheet_ns, "sheet"), {
+            "name": sheet_name,
+            "sheetId": str(sheet_index),
+            tag(document_rel_ns, "id"): "rId" + str(sheet_index),
+        })
+        ET.SubElement(workbook_rels, tag(package_rel_ns, "Relationship"), {
+            "Id": "rId" + str(sheet_index),
+            "Type": document_rel_ns + "/worksheet",
+            "Target": "worksheets/sheet" + str(sheet_index) + ".xml",
+        })
+        ET.SubElement(content_types, tag(content_types_ns, "Override"), {
+            "PartName": "/xl/worksheets/sheet" + str(sheet_index) + ".xml",
+            "ContentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml",
+        })
+
+        worksheet = ET.Element(tag(spreadsheet_ns, "worksheet"))
+        sheet_data = ET.SubElement(worksheet, tag(spreadsheet_ns, "sheetData"))
+        for row_number, values in (
+            (1, [str(network.get("name") or "Réseau sans nom")]),
+            (2, ["Organisation", str(network.get("organizationName") or "")]),
+            (3, ["Capturé le", str(network.get("capturedAt") or "")]),
+            (4, headers),
+        ):
+            row = ET.SubElement(sheet_data, tag(spreadsheet_ns, "row"), {"r": str(row_number)})
+            for column_index, value in enumerate(values, start=1):
+                add_cell(row, column_name(column_index) + str(row_number), value)
+
+        for row_number, device in enumerate(network.get("devices", []), start=5):
+            values = [
+                device.get("name"), device.get("model"), device.get("serial"),
+                device.get("management_ip"), device.get("current_version"), device.get("status"),
+            ]
+            row = ET.SubElement(sheet_data, tag(spreadsheet_ns, "row"), {"r": str(row_number)})
+            for column_index, value in enumerate(values, start=1):
+                add_cell(row, column_name(column_index) + str(row_number), value)
+        worksheet_files.append(("xl/worksheets/sheet" + str(sheet_index) + ".xml", ET.tostring(
+            worksheet, encoding="utf-8", xml_declaration=True
+        )))
+
+    workbook_bytes = ET.tostring(workbook, encoding="utf-8", xml_declaration=True)
+    rels_bytes = ET.tostring(workbook_rels, encoding="utf-8", xml_declaration=True)
+    types_bytes = ET.tostring(content_types, encoding="utf-8", xml_declaration=True)
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("[Content_Types].xml", types_bytes)
+        archive.writestr("_rels/.rels", (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<Relationships xmlns="' + package_rel_ns + '">'
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+            '</Relationships>'
+        ))
+        archive.writestr("xl/workbook.xml", workbook_bytes)
+        archive.writestr("xl/_rels/workbook.xml.rels", rels_bytes)
+        for filename, worksheet in worksheet_files:
+            archive.writestr(filename, worksheet)
+    return output.getvalue()
 
 
 def read_inventory_network(network_id: str) -> dict[str, str] | None:
@@ -558,6 +674,23 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(200, {"networks": read_inventory()})
             except sqlite3.Error as exc:
                 self.send_json(500, {"error": "Impossible de lire l’inventaire enregistré."})
+            return
+        if self.path == "/api/inventory/export":
+            try:
+                workbook = build_inventory_xlsx(read_inventory())
+            except sqlite3.Error:
+                self.send_json(500, {"error": "Impossible de lire l’inventaire enregistré."})
+                return
+            self.send_response(200)
+            self.send_header(
+                "Content-Type",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+            self.send_header("Content-Disposition", 'attachment; filename="inventaire-meraki.xlsx"')
+            self.send_header("Content-Length", str(len(workbook)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(workbook)
             return
         if self.path in ("/", "/index.html"):
             page = (APP_DIR / "index.html").read_bytes()
